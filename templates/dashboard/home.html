@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+    <h1>Bem-vindo, {{ request.user.username }}</h1>
+
+    <p>Você está logado no sistema de plantões.</p>
+
+    <a href="{% url 'logout' %}">Sair</a>
+</body>
+</html>
