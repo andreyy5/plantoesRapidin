@@ -3,4 +3,8 @@ from django.shortcuts import render
 
 @login_required
 def dashboard(request):
-    return render(request, 'dashboard/home.html')
+    if request.user.groups.filter(name='Administrador').exists():
+        return render(request, 'dashboard/admin.html')
+    
+    return render(request, 'dashboard/colaborador.html')
+
