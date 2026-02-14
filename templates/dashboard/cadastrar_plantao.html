@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }} - Sistema de Plantões{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card" style="border: 2px solid rgba(255, 102, 0, 0.4);">
+            <div class="card-header" style="background: linear-gradient(135deg, rgba(255, 102, 0, 0.15) 0%, rgba(255, 140, 0, 0.08) 100%);">
+                <h4 class="mb-0" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">
+                    <i class="bi bi-calendar-plus"></i> {{ titulo }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.colaborador.id_for_label }}" class="form-label">
+                            {{ form.colaborador.label }}
+                            <span style="color: #ef4444;">*</span>
+                        </label>
+                        {{ form.colaborador }}
+                        {% if form.colaborador.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.colaborador.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted d-block mt-1">Selecione o colaborador que fará o plantão</small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.data.id_for_label }}" class="form-label">
+                            {{ form.data.label }}
+                            <span style="color: #ef4444;">*</span>
+                        </label>
+                        {{ form.data }}
+                        {% if form.data.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.data.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted d-block mt-1">Data do plantão (Sábado ou Domingo)</small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.turno.id_for_label }}" class="form-label">
+                            {{ form.turno.label }}
+                            <span style="color: #ef4444;">*</span>
+                        </label>
+                        {{ form.turno }}
+                        {% if form.turno.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.turno.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted d-block mt-1">Selecione o turno do plantão</small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.observacoes.id_for_label }}" class="form-label">
+                            {{ form.observacoes.label }}
+                        </label>
+                        {{ form.observacoes }}
+                        {% if form.observacoes.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.observacoes.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Importante:</strong> Os horários são definidos automaticamente baseado no turno selecionado.
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Salvar Plantão
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Card informativo sobre turnos -->
+        <div class="card mt-4" style="border: 2px solid rgba(59, 130, 246, 0.3);">
+            <div class="card-header" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);">
+                <h5 class="mb-0" style="color: #3b82f6; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                    <i class="bi bi-clock-history"></i> Horários dos Turnos
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                            <i class="bi bi-calendar"></i> Sábado
+                        </h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="bi bi-clock" style="color: #ff6600;"></i> <strong>Tarde 1:</strong> 13:00 - 17:00</li>
+                            <li><i class="bi bi-clock" style="color: #ff6600;"></i> <strong>Tarde 2:</strong> 17:00 - 21:00</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 style="color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                            <i class="bi bi-calendar"></i> Domingo
+                        </h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="bi bi-clock" style="color: #10b981;"></i> <strong>Manhã:</strong> 08:00 - 13:00</li>
+                            <li class="mb-2"><i class="bi bi-clock" style="color: #10b981;"></i> <strong>Tarde 1:</strong> 13:00 - 17:00</li>
+                            <li><i class="bi bi-clock" style="color: #10b981;"></i> <strong>Tarde 2:</strong> 17:00 - 21:00</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ titulo }} - Sistema de Plantões{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card" style="border: 2px solid rgba(255, 102, 0, 0.4);">
+            <div class="card-header" style="background: linear-gradient(135deg, rgba(255, 102, 0, 0.15) 0%, rgba(255, 140, 0, 0.08) 100%);">
+                <h4 class="mb-0" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">
+                    <i class="bi bi-person-plus"></i> {{ titulo }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.nome_completo.id_for_label }}" class="form-label">
+                            Nome Completo
+                            <span style="color: #ef4444;">*</span>
+                        </label>
+                        {{ form.nome_completo }}
+                        {% if form.nome_completo.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.nome_completo.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.ordem_fila.id_for_label }}" class="form-label">
+                            Ordem na Fila
+                            <span style="color: #ef4444;">*</span>
+                        </label>
+                        {{ form.ordem_fila }}
+                        {% if form.ordem_fila.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.ordem_fila.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted d-block mt-1">
+                            <i class="bi bi-info-circle" style="color: #3b82f6;"></i> 
+                            Define a posição deste colaborador na fila de plantões (menor número = prioridade maior)
+                        </small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check" style="padding-left: 2rem;">
+                            {{ form.ativo }}
+                            <label class="form-check-label" for="{{ form.ativo.id_for_label }}" style="color: #ffffff; font-weight: 600;">
+                                Colaborador Ativo
+                            </label>
+                        </div>
+                        {% if form.ativo.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.ativo.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted d-block mt-1">
+                            Apenas colaboradores ativos aparecem na geração automática de escala
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-info" style="border: 2px solid #3b82f6; background: rgba(59, 130, 246, 0.1);">
+                        <i class="bi bi-info-circle" style="color: #3b82f6;"></i> 
+                        <strong style="color: #3b82f6;">Importante:</strong> Após cadastrar, você pode vincular este colaborador a um usuário do sistema posteriormente, se necessário.
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'gerenciar_colaboradores' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Salvar Colaborador
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

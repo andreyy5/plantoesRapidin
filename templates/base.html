@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Plantões{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --primary-orange: #ff6600;
+            --dark-orange: #ff8c00;
+            --bg-dark: #0a0a0a;
+            --bg-card: rgba(26, 26, 26, 0.6);
+            --text-light: #ffffff;
+            --text-gray: #9ca3af;
+            --border-subtle: rgba(255, 102, 0, 0.15);
+        }
+        
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-orange) var(--bg-dark);
+        }
+        
+        *::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        *::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        
+        *::-webkit-scrollbar-thumb {
+            background: var(--primary-orange);
+            border-radius: 4px;
+        }
+        
+        *::-webkit-scrollbar-thumb:hover {
+            background: var(--dark-orange);
+        }
+        
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+        
+        body {
+            min-height: 100vh;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255, 102, 0, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 102, 0, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border-right: 1px solid var(--border-subtle);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .sidebar .nav-link {
+            color: var(--text-gray);
+            padding: 14px 20px;
+            margin: 8px 15px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .sidebar .nav-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: var(--primary-orange);
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+            border-radius: 0 3px 3px 0;
+        }
+        
+        .sidebar .nav-link:hover {
+            background-color: rgba(255, 102, 0, 0.08);
+            border-color: var(--border-subtle);
+            color: var(--primary-orange);
+            transform: translateX(5px);
+        }
+        
+        .sidebar .nav-link:hover::before {
+            transform: scaleY(1);
+        }
+        
+        .sidebar .nav-link.active {
+            background: rgba(255, 102, 0, 0.12);
+            border-color: var(--border-subtle);
+            color: var(--primary-orange);
+        }
+        
+        .sidebar .nav-link.active::before {
+            transform: scaleY(1);
+        }
+        
+        .sidebar .nav-link i {
+            margin-right: 12px;
+            width: 20px;
+            text-align: center;
+            font-size: 1.1rem;
+        }
+        
+        .content-wrapper {
+            padding: 30px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            margin-bottom: 25px;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            border-color: rgba(255, 102, 0, 0.25);
+        }
+        
+        .card-header {
+            background: rgba(255, 102, 0, 0.05);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 20px 25px;
+            font-weight: 600;
+            color: var(--primary-orange);
+            border-radius: 11px 11px 0 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+        
+        .card-body {
+            padding: 25px;
+            color: var(--text-light);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #ff6600 0%, #ff8c00 100%);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            color: #000;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 102, 0, 0.3);
+            background: linear-gradient(135deg, #ff8c00 0%, #ff6600 100%);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            color: #fff;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(156, 163, 175, 0.15);
+            border: 1px solid rgba(156, 163, 175, 0.3);
+            padding: 12px 30px;
+            border-radius: 10px;
+            color: var(--text-gray);
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(156, 163, 175, 0.25);
+            border-color: rgba(156, 163, 175, 0.5);
+            color: var(--text-light);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            color: #fff;
+            font-weight: 700;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+        
+        .btn-outline-primary,
+        .btn-outline-danger {
+            background: transparent;
+            border: 1.5px solid;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-outline-primary {
+            border-color: var(--primary-orange);
+            color: var(--primary-orange);
+        }
+        
+        .btn-outline-primary:hover {
+            background: var(--primary-orange);
+            color: #000;
+        }
+        
+        .btn-outline-danger {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        
+        .btn-outline-danger:hover {
+            background: #ef4444;
+            color: #fff;
+        }
+        
+        .table {
+            color: var(--text-light);
+            background: transparent;
+        }
+        
+        .table-plantoes {
+            margin: 0;
+            background: transparent;
+        }
+        
+        .table-plantoes thead {
+            background: rgba(255, 102, 0, 0.05);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        
+        .table-plantoes thead th {
+            color: var(--primary-orange);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.85rem;
+            padding: 15px;
+            border: none;
+            background: transparent;
+        }
+        
+        .table-plantoes tbody {
+            background: transparent !important;
+        }
+        
+        .table-plantoes tbody tr {
+            border-bottom: 1px solid rgba(255, 102, 0, 0.08);
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+        
+        .table-plantoes tbody tr:hover {
+            background: rgba(255, 102, 0, 0.05) !important;
+            transform: translateX(3px);
+        }
+        
+        .table-plantoes tbody td {
+            padding: 15px;
+            vertical-align: middle;
+            border: none;
+            background: transparent;
+            color: var(--text-light);
+        }
+        
+        .table-plantoes tbody td strong {
+            color: var(--text-light);
+            font-weight: 600;
+        }
+        
+        .badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.75rem;
+        }
+        
+        .badge.bg-primary {
+            background: linear-gradient(135deg, #ff6600 0%, #ff8c00 100%) !important;
+            color: #000;
+        }
+        
+        .badge.bg-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        }
+        
+        .badge.bg-secondary {
+            background: rgba(156, 163, 175, 0.25) !important;
+            color: var(--text-light);
+        }
+        
+        .user-info {
+            padding: 25px;
+            border-bottom: 1px solid var(--border-subtle);
+            background: rgba(255, 102, 0, 0.05);
+        }
+        
+        .user-info .fw-bold {
+            color: var(--primary-orange);
+            font-size: 1.05rem;
+        }
+        
+        .form-control, .form-select {
+            background: rgba(26, 26, 26, 0.6);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-light);
+            padding: 12px 16px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background: rgba(26, 26, 26, 0.8);
+            border-color: rgba(255, 102, 0, 0.4);
+            color: var(--text-light);
+            box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.1);
+        }
+        
+        .form-control::placeholder {
+            color: var(--text-gray);
+        }
+        
+        .form-label {
+            color: var(--primary-orange);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .alert {
+            border-radius: 12px;
+            border: 1px solid;
+            padding: 15px 20px;
+            font-weight: 500;
+            background: rgba(26, 26, 26, 0.4);
+            backdrop-filter: blur(10px);
+        }
+        
+        .alert-success {
+            border-color: #10b981;
+            color: #10b981;
+        }
+        
+        .alert-danger, .alert-error {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        
+        .alert-info {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .alert-warning {
+            border-color: #fb923c;
+            color: #fb923c;
+        }
+        
+        .text-muted {
+            color: var(--text-gray) !important;
+        }
+        
+        .text-primary {
+            color: var(--primary-orange) !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--text-light);
+        }
+        
+        hr {
+            border-color: var(--border-subtle);
+            opacity: 1;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 px-0 sidebar">
+                <div class="user-info">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-person-circle fs-3 me-2"></i>
+                        <div>
+                            <div class="fw-bold">{{ user.get_full_name|default:user.username }}</div>
+                            <small class="text-white-50">{{ user.email }}</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <nav class="nav flex-column mt-4">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+                        <i class="bi bi-house-door"></i> Dashboard
+                    </a>
+                    <a class="nav-link {% if 'plantao' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'cadastrar_plantao' %}">
+                        <i class="bi bi-calendar-plus"></i> Cadastrar Plantão
+                    </a>
+                    <a class="nav-link" href="{% url 'gerar_escala' %}">
+                        <i class="bi bi-calendar-check"></i> Gerar Escala
+                    </a>
+                    <a class="nav-link {% if 'colaborador' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'gerenciar_colaboradores' %}">
+                        <i class="bi bi-people"></i> Colaboradores
+                    </a>
+                    
+                    <hr class="text-white-50 mx-3">
+                    
+                    <a class="nav-link" href="{% url 'logout' %}">
+                        <i class="bi bi-box-arrow-right"></i> Sair
+                    </a>
+                </nav>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-10">
+                <div class="content-wrapper">
+                    <!-- Messages -->
+                    {% if messages %}
+                        <div class="mb-4">
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    <i class="bi bi-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    {% block content %}{% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

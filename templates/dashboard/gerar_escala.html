@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerar Escala Automática - Sistema de Plantões{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card" style="border: 2px solid rgba(255, 102, 0, 0.4);">
+            <div class="card-header" style="background: linear-gradient(135deg, rgba(255, 102, 0, 0.15) 0%, rgba(255, 140, 0, 0.08) 100%);">
+                <h4 class="mb-0" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">
+                    <i class="bi bi-magic"></i> Gerar Escala Automática
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info" style="border: 2px solid #3b82f6; background: rgba(59, 130, 246, 0.1);">
+                    <h5 class="alert-heading" style="color: #3b82f6; font-weight: 700; text-transform: uppercase;">
+                        <i class="bi bi-info-circle"></i> Como funciona?
+                    </h5>
+                    <p>A escala automática segue as seguintes regras:</p>
+                    <ul class="mb-0">
+                        <li><strong style="color: #ff6600;">Sábado 13:00-17:00:</strong> Colaborador A (da fila)</li>
+                        <li><strong style="color: #ff6600;">Sábado 17:00-21:00:</strong> Colaborador B (próximo na fila)</li>
+                        <li><strong style="color: #10b981;">Domingo 08:00-13:00:</strong> Colaborador B (mesmo da noite de sábado)</li>
+                        <li><strong style="color: #10b981;">Domingo 13:00-17:00:</strong> Colaborador A (mesmo da tarde de sábado)</li>
+                        <li><strong style="color: #10b981;">Domingo 17:00-21:00:</strong> Colaborador C (próximo na fila)</li>
+                    </ul>
+                    <hr style="border-color: rgba(59, 130, 246, 0.3);">
+                    <p class="mb-0"><small>Na próxima semana, a fila avança 2 posições e o processo se repete.</small></p>
+                </div>
+                
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.data_inicio.id_for_label }}" class="form-label">
+                            {{ form.data_inicio.label }}
+                            <span style="color: #ef4444;">*</span>
+                        </label>
+                        {{ form.data_inicio }}
+                        {% if form.data_inicio.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.data_inicio.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted d-block mt-1">
+                            <i class="bi bi-exclamation-triangle" style="color: #fb923c;"></i> 
+                            A data deve ser um <strong>sábado</strong>
+                        </small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.semanas_gerar.id_for_label }}" class="form-label">
+                            {{ form.semanas_gerar.label }}
+                            <span style="color: #ef4444;">*</span>
+                        </label>
+                        {{ form.semanas_gerar }}
+                        {% if form.semanas_gerar.errors %}
+                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
+                                {{ form.semanas_gerar.errors }}
+                            </div>
+                        {% endif %}
+                        <small class="text-muted d-block mt-1">Quantidade de semanas que serão geradas (1 a 12)</small>
+                    </div>
+                    
+                    <div class="alert alert-warning" style="border: 2px solid #fb923c; background: rgba(251, 146, 60, 0.1);">
+                        <i class="bi bi-exclamation-triangle" style="color: #fb923c;"></i> 
+                        <strong style="color: #fb923c;">Atenção:</strong> Certifique-se de que os colaboradores estão cadastrados e na ordem correta da fila antes de gerar a escala.
+                        <a href="{% url 'gerenciar_colaboradores' %}" class="alert-link" style="color: #ff6600; font-weight: 700;">Gerenciar Colaboradores</a>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-magic"></i> Gerar Escala
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Preview da lógica -->
+        <div class="card mt-4" style="border: 2px solid rgba(16, 185, 129, 0.3);">
+            <div class="card-header" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);">
+                <h5 class="mb-0" style="color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                    <i class="bi bi-eye"></i> Exemplo de Escala
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Exemplo considerando 5 colaboradores: Andrey, Jose Neto, Karlos, Maria Eduarda, Angela</p>
+                
+                <div class="table-responsive">
+                    <table class="table table-bordered" style="border-color: rgba(255, 102, 0, 0.2);">
+                        <thead style="background: rgba(255, 102, 0, 0.1);">
+                            <tr>
+                                <th style="color: #ff6600; font-weight: 700; text-transform: uppercase;">Semana</th>
+                                <th style="color: #ff6600; font-weight: 700; text-transform: uppercase;">Sáb 13-17</th>
+                                <th style="color: #ff6600; font-weight: 700; text-transform: uppercase;">Sáb 17-21</th>
+                                <th style="color: #10b981; font-weight: 700; text-transform: uppercase;">Dom 08-13</th>
+                                <th style="color: #10b981; font-weight: 700; text-transform: uppercase;">Dom 13-17</th>
+                                <th style="color: #10b981; font-weight: 700; text-transform: uppercase;">Dom 17-21</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid rgba(255, 102, 0, 0.1);">
+                                <td><strong style="color: #ff6600;">1</strong></td>
+                                <td>Andrey</td>
+                                <td>Jose Neto</td>
+                                <td>Jose Neto</td>
+                                <td>Andrey</td>
+                                <td>Karlos</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 102, 0, 0.1);">
+                                <td><strong style="color: #ff6600;">2</strong></td>
+                                <td>Karlos</td>
+                                <td>Maria Eduarda</td>
+                                <td>Maria Eduarda</td>
+                                <td>Karlos</td>
+                                <td>Angela</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid rgba(255, 102, 0, 0.1);">
+                                <td><strong style="color: #ff6600;">3</strong></td>
+                                <td>Angela</td>
+                                <td>Andrey</td>
+                                <td>Andrey</td>
+                                <td>Angela</td>
+                                <td>Jose Neto</td>
+                            </tr>
+                            <tr>
+                                <td><strong style="color: #ff6600;">4</strong></td>
+                                <td>Jose Neto</td>
+                                <td>Karlos</td>
+                                <td>Karlos</td>
+                                <td>Jose Neto</td>
+                                <td>Maria Eduarda</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <small class="text-muted">
+                    <i class="bi bi-info-circle" style="color: #3b82f6;"></i> 
+                    Note como a fila rotaciona mantendo a lógica: quem pega sábado à noite, pega domingo de manhã.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,13 +1,164 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Dashboard</title>
-</head>
-<body>
-    <h1>Bem-vindo, {{ request.user.username }}</h1>
+{% extends 'base.html' %}
 
-    <p>Você está logado no sistema de plantões.</p>
+{% block title %}Dashboard - Sistema de Plantões{% endblock %}
 
-    <a href="{% url 'logout' %}">Sair</a>
-</body>
-</html>
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
+            <i class="bi bi-calendar-week"></i> Dashboard de Plantões
+        </h2>
+        <p class="text-muted">Visualize e gerencie os plantões escalados</p>
+    </div>
+    <div>
+        <a href="{% url 'cadastrar_plantao' %}" class="btn btn-primary me-2">
+            <i class="bi bi-plus-circle"></i> Novo Plantão
+        </a>
+        <a href="{% url 'gerar_escala' %}" class="btn btn-success">
+            <i class="bi bi-magic"></i> Gerar Escala
+        </a>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title mb-3"><i class="bi bi-funnel"></i> Filtros</h5>
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                {{ filtro_form.data_inicio }}
+            </div>
+            <div class="col-md-3">
+                {{ filtro_form.data_fim }}
+            </div>
+            <div class="col-md-3">
+                {{ filtro_form.colaborador }}
+            </div>
+            <div class="col-md-2">
+                {{ filtro_form.dia_semana }}
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Estatísticas -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center" style="border: 1px solid rgba(255, 102, 0, 0.2); background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(10px);">
+            <div class="card-body">
+                <i class="bi bi-calendar-check fs-1" style="color: #ff6600;"></i>
+                <h3 class="mt-2" style="color: #ff6600; font-weight: 700;">{{ total_plantoes }}</h3>
+                <p class="text-muted mb-0" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem;">Plantões Escalados</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center" style="border: 1px solid rgba(16, 185, 129, 0.2); background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(10px);">
+            <div class="card-body">
+                <i class="bi bi-calendar-week fs-1" style="color: #10b981;"></i>
+                <h3 class="mt-2" style="color: #10b981; font-weight: 700;">{{ plantoes_agrupados|length }}</h3>
+                <p class="text-muted mb-0" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem;">Semanas</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center" style="border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(10px);">
+            <div class="card-body">
+                <i class="bi bi-people fs-1" style="color: #3b82f6;"></i>
+                <h3 class="mt-2" style="color: #3b82f6; font-weight: 700;">{{ colaboradores_count|default:"--" }}</h3>
+                <p class="text-muted mb-0" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem;">Colaboradores Ativos</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plantões por Semana -->
+{% if plantoes_agrupados %}
+    {% for semana_key, semana_data in plantoes_agrupados.items %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-calendar-range"></i> 
+            Semana de {{ semana_data.inicio|date:"d/m/Y" }} a {{ semana_data.fim|date:"d/m/Y" }}
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-plantoes mb-0">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Dia</th>
+                            <th>Turno</th>
+                            <th>Horário</th>
+                            <th>Colaborador</th>
+                            <th>Observações</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody style="background: transparent;">
+                        {% for plantao in semana_data.plantoes %}
+                        <tr>
+                            <td>{{ plantao.data|date:"d/m/Y" }}</td>
+                            <td>
+                                <span class="badge {% if plantao.dia_semana == 'SAB' %}bg-primary{% else %}bg-success{% endif %}">
+                                    {{ plantao.get_dia_semana_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary" style="background: rgba(156, 163, 175, 0.2) !important; padding: 6px 12px; font-size: 0.75rem;">
+                                    {{ plantao.get_turno_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <i class="bi bi-clock" style="color: #ff6600;"></i> 
+                                {{ plantao.hora_inicio|time:"H:i" }} - {{ plantao.hora_fim|time:"H:i" }}
+                            </td>
+                            <td>
+                                <strong>{{ plantao.colaborador.nome_completo }}</strong>
+                            </td>
+                            <td>
+                                {% if plantao.observacoes %}
+                                    <small class="text-muted">{{ plantao.observacoes|truncatewords:10 }}</small>
+                                {% else %}
+                                    <small class="text-muted">--</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'editar_plantao' plantao.id %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'deletar_plantao' plantao.id %}" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-calendar-x fs-1 text-muted"></i>
+            <h4 class="mt-3 text-muted">Nenhum plantão encontrado</h4>
+            <p class="text-muted">Comece cadastrando plantões manualmente ou gerando uma escala automática.</p>
+            <div class="mt-4">
+                <a href="{% url 'cadastrar_plantao' %}" class="btn btn-primary me-2">
+                    <i class="bi bi-plus-circle"></i> Cadastrar Plantão
+                </a>
+                <a href="{% url 'gerar_escala' %}" class="btn btn-success">
+                    <i class="bi bi-magic"></i> Gerar Escala Automática
+                </a>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}
