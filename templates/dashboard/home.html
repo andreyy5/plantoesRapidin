@@ -8,8 +8,15 @@
         <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
             <i class="bi bi-calendar-week"></i> Dashboard de Plantões
         </h2>
-        <p class="text-muted">Visualize e gerencie os plantões escalados</p>
+        <p class="text-muted">
+            {% if is_colaborador and not is_admin %}
+                Visualize seus plantões escalados
+            {% else %}
+                Visualize e gerencie os plantões escalados
+            {% endif %}
+        </p>
     </div>
+    {% if is_admin %}
     <div>
         <a href="{% url 'cadastrar_plantao' %}" class="btn btn-primary me-2">
             <i class="bi bi-plus-circle"></i> Novo Plantão
@@ -18,6 +25,7 @@
             <i class="bi bi-magic"></i> Gerar Escala
         </a>
     </div>
+    {% endif %}
 </div>
 
 <!-- Filtros -->
@@ -96,7 +104,9 @@
                             <th>Horário</th>
                             <th>Colaborador</th>
                             <th>Observações</th>
+                            {% if is_admin %}
                             <th class="text-center">Ações</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody style="background: transparent;">
@@ -127,6 +137,7 @@
                                     <small class="text-muted">--</small>
                                 {% endif %}
                             </td>
+                            {% if is_admin %}
                             <td class="text-center">
                                 <a href="{% url 'editar_plantao' plantao.id %}" class="btn btn-sm btn-outline-primary" title="Editar">
                                     <i class="bi bi-pencil"></i>
@@ -135,6 +146,7 @@
                                     <i class="bi bi-trash"></i>
                                 </a>
                             </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>

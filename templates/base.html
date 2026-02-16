@@ -446,15 +446,18 @@
                     <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
                         <i class="bi bi-house-door"></i> Dashboard
                     </a>
-                    <a class="nav-link {% if 'plantao' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'cadastrar_plantao' %}">
+                    
+                    {% if is_admin %}
+                    <a class="nav-link {% if 'cadastrar_plantao' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'cadastrar_plantao' %}">
                         <i class="bi bi-calendar-plus"></i> Cadastrar Plantão
                     </a>
-                    <a class="nav-link" href="{% url 'gerar_escala' %}">
+                    <a class="nav-link {% if 'gerar_escala' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'gerar_escala' %}">
                         <i class="bi bi-calendar-check"></i> Gerar Escala
                     </a>
                     <a class="nav-link {% if 'colaborador' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'gerenciar_colaboradores' %}">
                         <i class="bi bi-people"></i> Colaboradores
                     </a>
+                    {% endif %}
                     
                     <hr class="text-white-50 mx-3">
                     
