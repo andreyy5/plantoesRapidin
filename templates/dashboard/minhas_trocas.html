@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+
+{% block title %}Minhas Trocas - Sistema de Plantões{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
+            <i class="bi bi-arrow-left-right"></i> Minhas Trocas
+        </h2>
+        <p class="text-muted">Gerencie suas solicitações de troca de plantão</p>
+    </div>
+    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<!-- Trocas Recebidas (Pendentes) -->
+{% if trocas_recebidas %}
+<div class="card mb-4" style="border: 1px solid rgba(251, 146, 60, 0.4);">
+    <div class="card-header" style="color: #fb923c;">
+        <i class="bi bi-bell-fill"></i> 
+        Solicitações Recebidas
+        <span class="badge rounded-pill ms-2" style="background: #fb923c; color: #000;">{{ trocas_recebidas|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% for troca in trocas_recebidas %}
+        <div class="p-4" style="border-bottom: 1px solid rgba(255, 102, 0, 0.1);">
+            <div class="row align-items-center">
+                <!-- Quem pediu -->
+                <div class="col-md-3">
+                    <small class="text-muted d-block" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem;">Solicitante</small>
+                    <strong style="color: #ff6600;">{{ troca.solicitante.nome_completo }}</strong>
+                    <small class="text-muted d-block">{{ troca.criado_em|date:"d/m/Y H:i" }}</small>
+                </div>
+
+                <!-- Plantão deles -->
+                <div class="col-md-3 text-center">
+                    <small class="text-muted d-block" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem;">Plantão deles</small>
+                    <div class="p-2 rounded mt-1" style="background: rgba(255, 102, 0, 0.1); border: 1px solid rgba(255, 102, 0, 0.3);">
+                        <strong style="color: #ff6600;">{{ troca.plantao_solicitante.data|date:"d/m/Y" }}</strong><br>
+                        <small>{{ troca.plantao_solicitante.hora_inicio|time:"H:i" }} - {{ troca.plantao_solicitante.hora_fim|time:"H:i" }}</small><br>
+                        <span class="badge {% if troca.plantao_solicitante.dia_semana == 'SAB' %}bg-primary{% else %}bg-success{% endif %}" style="font-size: 0.7rem;">
+                            {{ troca.plantao_solicitante.get_dia_semana_display }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Seta -->
+                <div class="col-md-1 text-center">
+                    <i class="bi bi-arrow-left-right fs-4" style="color: #10b981;"></i>
+                </div>
+
+                <!-- Plantão seu -->
+                <div class="col-md-3 text-center">
+                    <small class="text-muted d-block" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem;">Seu plantão</small>
+                    <div class="p-2 rounded mt-1" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <strong style="color: #10b981;">{{ troca.plantao_destinatario.data|date:"d/m/Y" }}</strong><br>
+                        <small>{{ troca.plantao_destinatario.hora_inicio|time:"H:i" }} - {{ troca.plantao_destinatario.hora_fim|time:"H:i" }}</small><br>
+                        <span class="badge {% if troca.plantao_destinatario.dia_semana == 'SAB' %}bg-primary{% else %}bg-success{% endif %}" style="font-size: 0.7rem;">
+                            {{ troca.plantao_destinatario.get_dia_semana_display }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Ações -->
+                <div class="col-md-2 text-center">
+                    {% if troca.mensagem %}
+                    <small class="text-muted d-block mb-2" style="font-style: italic;">
+                        "{{ troca.mensagem|truncatewords:8 }}"
+                    </small>
+                    {% endif %}
+                    <a href="{% url 'responder_troca' troca.id 'aceitar' %}" 
+                       class="btn btn-sm btn-success w-100 mb-2"
+                       onclick="return confirm('Confirma a troca de plantão?')">
+                        <i class="bi bi-check-circle"></i> Aceitar
+                    </a>
+                    <a href="{% url 'responder_troca' troca.id 'recusar' %}" 
+                       class="btn btn-sm btn-outline-danger w-100"
+                       onclick="return confirm('Tem certeza que deseja recusar?')">
+                        <i class="bi bi-x-circle"></i> Recusar
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Trocas Solicitadas por Mim -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-clock-history"></i> Histórico de Solicitações Enviadas
+    </div>
+    <div class="card-body p-0">
+        {% if trocas_solicitadas %}
+        <div class="table-responsive">
+            <table class="table table-hover table-plantoes mb-0">
+                <thead>
+                    <tr>
+                        <th>Para</th>
+                        <th>Meu Plantão</th>
+                        <th>Plantão Deles</th>
+                        <th>Data</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">Ação</th>
+                    </tr>
+                </thead>
+                <tbody style="background: transparent;">
+                    {% for troca in trocas_solicitadas %}
+                    <tr>
+                        <td>
+                            <strong>{{ troca.destinatario.nome_completo }}</strong>
+                        </td>
+                        <td>
+                            <small style="color: #ff6600;">{{ troca.plantao_solicitante.data|date:"d/m/Y" }}</small><br>
+                            <small class="text-muted">{{ troca.plantao_solicitante.hora_inicio|time:"H:i" }} - {{ troca.plantao_solicitante.hora_fim|time:"H:i" }}</small>
+                        </td>
+                        <td>
+                            <small style="color: #10b981;">{{ troca.plantao_destinatario.data|date:"d/m/Y" }}</small><br>
+                            <small class="text-muted">{{ troca.plantao_destinatario.hora_inicio|time:"H:i" }} - {{ troca.plantao_destinatario.hora_fim|time:"H:i" }}</small>
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ troca.criado_em|date:"d/m/Y H:i" }}</small>
+                        </td>
+                        <td class="text-center">
+                            {% if troca.status == 'PENDENTE' %}
+                            <span class="badge" style="background: rgba(251, 146, 60, 0.2); color: #fb923c; border: 1px solid #fb923c; padding: 6px 12px;">
+                                <i class="bi bi-hourglass-split"></i> Pendente
+                            </span>
+                            {% elif troca.status == 'ACEITA' %}
+                            <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; padding: 6px 12px;">
+                                <i class="bi bi-check-circle"></i> Aceita
+                            </span>
+                            {% elif troca.status == 'RECUSADA' %}
+                            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; padding: 6px 12px;">
+                                <i class="bi bi-x-circle"></i> Recusada
+                            </span>
+                            {% elif troca.status == 'CANCELADA' %}
+                            <span class="badge" style="background: rgba(156, 163, 175, 0.2); color: #9ca3af; border: 1px solid #9ca3af; padding: 6px 12px;">
+                                <i class="bi bi-slash-circle"></i> Cancelada
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if troca.status == 'PENDENTE' %}
+                            <a href="{% url 'cancelar_troca' troca.id %}" 
+                               class="btn btn-sm btn-outline-danger"
+                               onclick="return confirm('Cancelar esta solicitação?')">
+                                <i class="bi bi-x"></i> Cancelar
+                            </a>
+                            {% else %}
+                            <span class="text-muted" style="font-size: 0.8rem;">--</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-arrow-left-right fs-1 text-muted"></i>
+            <h5 class="mt-3 text-muted">Nenhuma solicitação enviada</h5>
+            <p class="text-muted">Você ainda não solicitou nenhuma troca de plantão.</p>
+            <a href="{% url 'dashboard' %}" class="btn btn-primary mt-2">
+                <i class="bi bi-calendar-check"></i> Ver meus plantões
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Colaborador, Plantao, EscalaAutomatica
+from .models import Colaborador, Plantao, EscalaAutomatica, TrocaPlantao, Notificacao
 
 
 @admin.register(Colaborador)
@@ -69,3 +69,16 @@ class EscalaAutomaticaAdmin(admin.ModelAdmin):
         if not obj.pk:
             obj.criada_por = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(TrocaPlantao)
+class TrocaPlantaoAdmin(admin.ModelAdmin):
+    list_display = ['solicitante', 'plantao_solicitante', 'destinatario', 'plantao_destinatario', 'status', 'criado_em']
+    list_filter = ['status', 'criado_em']
+    search_fields = ['solicitante__nome_completo', 'destinatario__nome_completo']
+
+@admin.register(Notificacao)
+class NotificacaoAdmin(admin.ModelAdmin):
+    list_display = ['colaborador', 'tipo', 'titulo', 'lida', 'criado_em']
+    list_filter = ['tipo', 'lida', 'criado_em']
+    search_fields = ['colaborador__nome_completo', 'titulo']

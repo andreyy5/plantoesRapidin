@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block title %}Solicitar Troca de Plantão{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
+            <i class="bi bi-arrow-left-right"></i> Solicitar Troca de Plantão
+        </h2>
+        <p class="text-muted">Selecione o plantão com quem deseja trocar</p>
+    </div>
+    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<!-- Meu Plantão -->
+<div class="card mb-4" style="border: 1px solid rgba(255, 102, 0, 0.4);">
+    <div class="card-header">
+        <i class="bi bi-person-check"></i> Seu Plantão (que será trocado)
+    </div>
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-2 text-center">
+                <span class="badge {% if meu_plantao.dia_semana == 'SAB' %}bg-primary{% else %}bg-success{% endif %}"
+                      style="font-size: 1rem; padding: 10px 20px;">
+                    {{ meu_plantao.get_dia_semana_display }}
+                </span>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted d-block" style="text-transform: uppercase; letter-spacing: 1px;">Data</small>
+                <strong style="font-size: 1.1rem;">{{ meu_plantao.data|date:"d/m/Y" }}</strong>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted d-block" style="text-transform: uppercase; letter-spacing: 1px;">Horário</small>
+                <strong style="font-size: 1.1rem; color: #ff6600;">
+                    <i class="bi bi-clock"></i>
+                    {{ meu_plantao.hora_inicio|time:"H:i" }} - {{ meu_plantao.hora_fim|time:"H:i" }}
+                </strong>
+            </div>
+            <div class="col-md-4">
+                <small class="text-muted d-block" style="text-transform: uppercase; letter-spacing: 1px;">Turno</small>
+                <span class="badge bg-secondary" style="background: rgba(156, 163, 175, 0.2) !important; padding: 8px 16px;">
+                    {{ meu_plantao.get_turno_display }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Formulário de troca -->
+<form method="post">
+    {% csrf_token %}
+
+    <!-- Lista de plantões disponíveis -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-calendar-check"></i> Escolha o Plantão para Trocar
+        </div>
+        <div class="card-body p-0">
+            {% if plantoes_disponiveis %}
+            <div class="table-responsive">
+                <table class="table table-hover table-plantoes mb-0">
+                    <thead>
+                        <tr>
+                            <th width="5%"></th>
+                            <th>Data</th>
+                            <th>Dia</th>
+                            <th>Turno</th>
+                            <th>Horário</th>
+                            <th>Colaborador</th>
+                        </tr>
+                    </thead>
+                    <tbody style="background: transparent;">
+                        {% for plantao in plantoes_disponiveis %}
+                        <tr style="cursor: pointer;" onclick="selecionarPlantao({{ plantao.id }}, this)">
+                            <td class="text-center">
+                                <input type="radio" 
+                                       name="plantao_destino" 
+                                       value="{{ plantao.id }}" 
+                                       id="plantao_{{ plantao.id }}"
+                                       style="accent-color: #ff6600; width: 18px; height: 18px;">
+                            </td>
+                            <td>{{ plantao.data|date:"d/m/Y" }}</td>
+                            <td>
+                                <span class="badge {% if plantao.dia_semana == 'SAB' %}bg-primary{% else %}bg-success{% endif %}">
+                                    {{ plantao.get_dia_semana_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary" style="background: rgba(156, 163, 175, 0.2) !important; padding: 6px 12px; font-size: 0.75rem;">
+                                    {{ plantao.get_turno_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <i class="bi bi-clock" style="color: #ff6600;"></i>
+                                {{ plantao.hora_inicio|time:"H:i" }} - {{ plantao.hora_fim|time:"H:i" }}
+                            </td>
+                            <td>
+                                <strong>{{ plantao.colaborador.nome_completo }}</strong>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-x fs-1 text-muted"></i>
+                <h5 class="mt-3 text-muted">Nenhum plantão disponível para troca</h5>
+                <p class="text-muted">Não há plantões futuros de outros colaboradores disponíveis.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if plantoes_disponiveis %}
+    <!-- Mensagem opcional -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-chat-left-text"></i> Mensagem (opcional)
+        </div>
+        <div class="card-body">
+            <textarea name="mensagem" 
+                      class="form-control" 
+                      rows="3" 
+                      placeholder="Adicione uma mensagem para o colaborador explicando o motivo da troca..."
+                      style="resize: none;"></textarea>
+            <small class="text-muted d-block mt-2">
+                <i class="bi bi-info-circle"></i> 
+                A mensagem será enviada junto com a notificação de solicitação.
+            </small>
+        </div>
+    </div>
+
+    <!-- Preview da troca -->
+    <div class="card mb-4" id="previewTroca" style="display: none; border: 1px solid rgba(16, 185, 129, 0.4);">
+        <div class="card-header" style="color: #10b981;">
+            <i class="bi bi-eye"></i> Preview da Troca
+        </div>
+        <div class="card-body">
+            <div class="row align-items-center text-center">
+                <div class="col-md-5">
+                    <p class="text-muted mb-1" style="font-size: 0.8rem; text-transform: uppercase;">Você entregará</p>
+                    <div class="p-3 rounded" style="background: rgba(255, 102, 0, 0.1); border: 1px solid rgba(255, 102, 0, 0.3);">
+                        <strong style="color: #ff6600;">{{ meu_plantao.data|date:"d/m/Y" }}</strong><br>
+                        <small>{{ meu_plantao.hora_inicio|time:"H:i" }} - {{ meu_plantao.hora_fim|time:"H:i" }}</small>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <i class="bi bi-arrow-left-right fs-2" style="color: #10b981;"></i>
+                </div>
+                <div class="col-md-5">
+                    <p class="text-muted mb-1" style="font-size: 0.8rem; text-transform: uppercase;">Você receberá</p>
+                    <div class="p-3 rounded" id="previewDestino" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <strong style="color: #10b981;" id="previewData">--</strong><br>
+                        <small id="previewHorario">--</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botões -->
+    <div class="d-flex justify-content-between">
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+            <i class="bi bi-x-circle"></i> Cancelar
+        </a>
+        <button type="submit" class="btn btn-primary" id="btnEnviar" disabled>
+            <i class="bi bi-send"></i> Enviar Solicitação de Troca
+        </button>
+    </div>
+    {% endif %}
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Dados dos plantões disponíveis para o preview
+    const plantoes = {
+        {% for plantao in plantoes_disponiveis %}
+        {{ plantao.id }}: {
+            data: "{{ plantao.data|date:'d/m/Y' }}",
+            horario: "{{ plantao.hora_inicio|time:'H:i' }} - {{ plantao.hora_fim|time:'H:i' }}",
+            colaborador: "{{ plantao.colaborador.nome_completo }}"
+        },
+        {% endfor %}
+    };
+
+    function selecionarPlantao(plantaoId, row) {
+        // Selecionar radio
+        document.getElementById('plantao_' + plantaoId).checked = true;
+
+        // Destacar linha selecionada
+        document.querySelectorAll('.table-plantoes tbody tr').forEach(tr => {
+            tr.style.background = 'transparent';
+            tr.style.borderLeft = 'none';
+        });
+        row.style.background = 'rgba(255, 102, 0, 0.08)';
+        row.style.borderLeft = '3px solid #ff6600';
+
+        // Atualizar preview
+        const p = plantoes[plantaoId];
+        document.getElementById('previewData').textContent = p.data;
+        document.getElementById('previewHorario').textContent = p.horario;
+        document.getElementById('previewTroca').style.display = 'block';
+
+        // Habilitar botão
+        document.getElementById('btnEnviar').disabled = false;
+    }
+</script>
+{% endblock %}

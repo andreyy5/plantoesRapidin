@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, time
+from django.utils import timezone
 
 class Colaborador(models.Model):
     """Modelo para representar os colaboradores que fazem plantão"""
@@ -115,3 +116,123 @@ class EscalaAutomatica(models.Model):
     
     def __str__(self):
         return f"Escala {self.data_inicio} - {self.semanas_gerar} semanas"
+
+class TrocaPlantao(models.Model):
+    """Modelo para gerenciar solicitações de troca de plantão"""
+    
+    STATUS_CHOICES = [
+        ('PENDENTE', 'Pendente'),
+        ('ACEITA', 'Aceita'),
+        ('RECUSADA', 'Recusada'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+    
+    solicitante = models.ForeignKey(
+        Colaborador,
+        on_delete=models.CASCADE,
+        related_name='trocas_solicitadas'
+    )
+    plantao_solicitante = models.ForeignKey(
+        Plantao,
+        on_delete=models.CASCADE,
+        related_name='troca_origem'
+    )
+    
+    destinatario = models.ForeignKey(
+        Colaborador,
+        on_delete=models.CASCADE,
+        related_name='trocas_recebidas'
+    )
+    plantao_destinatario = models.ForeignKey(
+        Plantao,
+        on_delete=models.CASCADE,
+        related_name='troca_destino'
+    )
+    
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDENTE')
+    mensagem = models.TextField(blank=True, null=True)
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    respondido_em = models.DateTimeField(blank=True, null=True)
+    
+    class Meta:
+        verbose_name = "Troca de Plantão"
+        verbose_name_plural = "Trocas de Plantões"
+        ordering = ['-criado_em']
+    
+    def __str__(self):
+        return f"{self.solicitante.nome_completo} ↔ {self.destinatario.nome_completo} ({self.status})"
+    
+    def aceitar_troca(self):
+        if self.status != 'PENDENTE':
+            raise ValueError('Apenas trocas pendentes podem ser aceitas')
+        
+        temp_colab = self.plantao_solicitante.colaborador
+        self.plantao_solicitante.colaborador = self.plantao_destinatario.colaborador
+        self.plantao_destinatario.colaborador = temp_colab
+        
+        self.plantao_solicitante.save()
+        self.plantao_destinatario.save()
+        
+        self.status = 'ACEITA'
+        self.respondido_em = timezone.now()
+        self.save()
+    
+    def recusar_troca(self):
+        if self.status != 'PENDENTE':
+            raise ValueError('Apenas trocas pendentes podem ser recusadas')
+        
+        self.status = 'RECUSADA'
+        self.respondido_em = timezone.now()
+        self.save()
+    
+    def cancelar_troca(self):
+        if self.status != 'PENDENTE':
+            raise ValueError('Apenas trocas pendentes podem ser canceladas')
+        
+        self.status = 'CANCELADA'
+        self.respondido_em = timezone.now()
+        self.save()
+
+
+class Notificacao(models.Model):
+    """Sistema de notificações"""
+    
+    TIPO_CHOICES = [
+        ('TROCA_SOLICITADA', 'Solicitação de Troca'),
+        ('TROCA_ACEITA', 'Troca Aceita'),
+        ('TROCA_RECUSADA', 'Troca Recusada'),
+        ('TROCA_CANCELADA', 'Troca Cancelada'),
+    ]
+    
+    colaborador = models.ForeignKey(
+        Colaborador,
+        on_delete=models.CASCADE,
+        related_name='notificacoes'
+    )
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    titulo = models.CharField(max_length=200)
+    mensagem = models.TextField()
+    
+    troca = models.ForeignKey(
+        TrocaPlantao,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='notificacoes'
+    )
+    
+    lida = models.BooleanField(default=False)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Notificação"
+        verbose_name_plural = "Notificações"
+        ordering = ['-criado_em']
+    
+    def __str__(self):
+        return f"{self.colaborador.nome_completo} - {self.titulo}"
+    
+    def marcar_como_lida(self):
+        self.lida = True
+        self.save()
