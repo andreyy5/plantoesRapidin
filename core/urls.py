@@ -2,6 +2,13 @@ from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from django.shortcuts import redirect
+from django.urls import path
+from apps.usuarios.views import (
+    CustomPasswordResetView,
+    CustomPasswordResetDoneView,
+    CustomPasswordResetConfirmView,
+    CustomPasswordResetCompleteView
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -18,4 +25,10 @@ urlpatterns = [
     
     # Redirecionamento da raiz - DEVE SER O ÚLTIMO
     path('', lambda request: redirect('dashboard')),
+
+    # Recuperação de senha
+    path('password-reset/', CustomPasswordResetView.as_view(), name='password_reset'),
+    path('password-reset/done/', CustomPasswordResetDoneView.as_view(), name='password_reset_done'),
+    path('password-reset/<uidb64>/<token>/', CustomPasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('password-reset/complete/', CustomPasswordResetCompleteView.as_view(), name='password_reset_complete'),
 ]
