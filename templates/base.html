@@ -432,7 +432,7 @@
         <div class="row">
             <!-- Sidebar -->
             <div class="col-md-2 px-0 sidebar">
-                <div class="user-info">
+<div class="user-info">
                     <div class="d-flex align-items-center">
                         <i class="bi bi-person-circle fs-3 me-2"></i>
                         <div>
@@ -442,40 +442,88 @@
                     </div>
                 </div>
                 
+                <!-- Menu de Seções (SAC vs Técnicos) - SÓ APARECE PARA ADMIN -->
+                {% if is_admin %}
+                <div class="mb-3 px-3 pt-3">
+                    <small class="text-muted d-block mb-2" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem;">
+                        Setor
+                    </small>
+                    <div class="btn-group w-100" role="group">
+                        <a href="{% url 'dashboard' %}" 
+                           class="btn btn-sm {% if 'tecnicos' not in request.path %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                           style="{% if 'tecnicos' not in request.path %}background: linear-gradient(135deg, #ff6600, #ff8c00); color: #000; border: none;{% else %}border-color: #ff6600; color: #ff6600;{% endif %}">
+                            <i class="bi bi-headset"></i> SAC
+                        </a>
+                        <a href="{% url 'dashboard_tecnicos' %}" 
+                           class="btn btn-sm {% if 'tecnicos' in request.path %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                           style="{% if 'tecnicos' in request.path %}background: linear-gradient(135deg, #ff6600, #ff8c00); color: #000; border: none;{% else %}border-color: #ff6600; color: #ff6600;{% endif %}">
+                            <i class="bi bi-tools"></i> Técnicos
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Navegação Condicional -->
                 <nav class="nav flex-column mt-4">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
-                        <i class="bi bi-house-door"></i> Dashboard
-                    </a>
-                    
-                    {% if is_colaborador and not is_admin %}
-                    <!-- Menu para Colaboradores -->
-                    <a class="nav-link {% if 'notificacoes' in request.resolver_match.url_name %}active{% endif %}" 
-                       href="{% url 'notificacoes' %}" style="position: relative;">
-                        <i class="bi bi-bell"></i> Notificações
-                        {% if notificacoes_nao_lidas > 0 %}
-                        <span class="badge rounded-pill bg-danger" 
-                              style="position: absolute; top: 8px; right: 15px; font-size: 0.7rem;">
-                            {{ notificacoes_nao_lidas }}
-                        </span>
+                    {% if 'tecnicos' in request.path %}
+                        <!-- ========== MENU TÉCNICOS ========== -->
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_tecnicos' %}active{% endif %}" 
+                           href="{% url 'dashboard_tecnicos' %}">
+                            <i class="bi bi-house-door"></i> Dashboard Técnicos
+                        </a>
+                        
+                        {% if is_admin %}
+                        <a class="nav-link {% if 'cadastrar_plantao_tecnico' in request.resolver_match.url_name %}active{% endif %}" 
+                           href="{% url 'cadastrar_plantao_tecnico' %}">
+                            <i class="bi bi-calendar-plus"></i> Cadastrar Plantão
+                        </a>
+                        <a class="nav-link {% if 'gerar_escala_tecnicos' in request.resolver_match.url_name %}active{% endif %}" 
+                           href="{% url 'gerar_escala_tecnicos' %}">
+                            <i class="bi bi-calendar-check"></i> Gerar Escala
+                        </a>
+                        <a class="nav-link {% if 'gerenciar_tecnicos' in request.resolver_match.url_name %}active{% endif %}" 
+                           href="{% url 'gerenciar_tecnicos' %}">
+                            <i class="bi bi-tools"></i> Técnicos
+                        </a>
                         {% endif %}
-                    </a>
-                    <a class="nav-link {% if 'minhas_trocas' in request.resolver_match.url_name %}active{% endif %}" 
-                       href="{% url 'minhas_trocas' %}">
-                        <i class="bi bi-arrow-left-right"></i> Trocas
-                    </a>
-                    {% endif %}
-                    
-                    {% if is_admin %}
-                    <!-- Menu para Administradores -->
-                    <a class="nav-link {% if 'cadastrar_plantao' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'cadastrar_plantao' %}">
-                        <i class="bi bi-calendar-plus"></i> Cadastrar Plantão
-                    </a>
-                    <a class="nav-link {% if 'gerar_escala' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'gerar_escala' %}">
-                        <i class="bi bi-calendar-check"></i> Gerar Escala
-                    </a>
-                    <a class="nav-link {% if 'colaborador' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'gerenciar_colaboradores' %}">
-                        <i class="bi bi-people"></i> Colaboradores
-                    </a>
+                    {% else %}
+                        <!-- ========== MENU SAC ========== -->
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+                           href="{% url 'dashboard' %}">
+                            <i class="bi bi-house-door"></i> Dashboard SAC
+                        </a>
+                        
+                        {% if is_colaborador and not is_admin %}
+                        <a class="nav-link {% if 'notificacoes' in request.resolver_match.url_name %}active{% endif %}" 
+                           href="{% url 'notificacoes' %}" style="position: relative;">
+                            <i class="bi bi-bell"></i> Notificações
+                            {% if notificacoes_nao_lidas > 0 %}
+                            <span class="badge rounded-pill bg-danger" 
+                                  style="position: absolute; top: 8px; right: 15px; font-size: 0.7rem;">
+                                {{ notificacoes_nao_lidas }}
+                            </span>
+                            {% endif %}
+                        </a>
+                        <a class="nav-link {% if 'minhas_trocas' in request.resolver_match.url_name %}active{% endif %}" 
+                           href="{% url 'minhas_trocas' %}">
+                            <i class="bi bi-arrow-left-right"></i> Trocas
+                        </a>
+                        {% endif %}
+                        
+                        {% if is_admin %}
+                        <a class="nav-link {% if 'cadastrar_plantao' in request.resolver_match.url_name %}active{% endif %}" 
+                           href="{% url 'cadastrar_plantao' %}">
+                            <i class="bi bi-calendar-plus"></i> Cadastrar Plantão
+                        </a>
+                        <a class="nav-link {% if 'gerar_escala' in request.resolver_match.url_name %}active{% endif %}" 
+                           href="{% url 'gerar_escala' %}">
+                            <i class="bi bi-calendar-check"></i> Gerar Escala
+                        </a>
+                        <a class="nav-link {% if 'colaborador' in request.resolver_match.url_name %}active{% endif %}" 
+                           href="{% url 'gerenciar_colaboradores' %}">
+                            <i class="bi bi-people"></i> Colaboradores
+                        </a>
+                        {% endif %}
                     {% endif %}
                     
                     <hr class="text-white-50 mx-3">

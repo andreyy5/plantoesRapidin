@@ -778,3 +778,330 @@ def notificacoes_processor(request):
             ).count()
             return {'notificacoes_nao_lidas': nao_lidas}
     return {'notificacoes_nao_lidas': 0}
+
+
+# Adicione estas views ao apps/plantao/views.py
+
+# ========== VIEWS PARA TÉCNICOS DE CAMPO ==========
+
+@login_required
+def dashboard_tecnicos(request):
+    """Dashboard de plantões de técnicos"""
+    
+    from .models import PlantaoTecnico, TecnicoCampo
+    
+    # Query base
+    plantoes = PlantaoTecnico.objects.select_related('tecnico_principal', 'tecnico_dupla').all()
+    
+    # Se for técnico (não admin), mostra apenas seus plantões
+    if is_colaborador(request.user) and not is_admin(request.user):
+        try:
+            tecnico = TecnicoCampo.objects.get(user=request.user)
+            plantoes = plantoes.filter(
+                Q(tecnico_principal=tecnico) | Q(tecnico_dupla=tecnico)
+            )
+        except TecnicoCampo.DoesNotExist:
+            plantoes = PlantaoTecnico.objects.none()
+    
+    # Filtrar próximas 4 semanas
+    hoje = datetime.now().date()
+    data_fim = hoje + timedelta(weeks=4)
+    plantoes = plantoes.filter(data__gte=hoje, data__lte=data_fim)
+    
+    # Agrupar por semana
+    plantoes_agrupados = {}
+    for plantao in plantoes:
+        inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
+        semana_key = inicio_semana.strftime('%Y-%m-%d')
+        
+        if semana_key not in plantoes_agrupados:
+            plantoes_agrupados[semana_key] = {
+                'inicio': inicio_semana,
+                'fim': inicio_semana + timedelta(days=6),
+                'plantoes': []
+            }
+        plantoes_agrupados[semana_key]['plantoes'].append(plantao)
+    
+    plantoes_agrupados = dict(sorted(plantoes_agrupados.items()))
+    
+    context = {
+        'plantoes_agrupados': plantoes_agrupados,
+        'total_plantoes': plantoes.count(),
+        'tecnicos_count': TecnicoCampo.objects.filter(ativo=True).count(),
+        'is_admin': is_admin(request.user),
+        'is_colaborador': is_colaborador(request.user),
+    }
+    
+    return render(request, 'dashboard/tecnicos/home.html', context)
+
+
+@login_required
+@admin_required
+def cadastrar_plantao_tecnico(request):
+    """Cadastrar plantão de técnico manualmente"""
+    
+    from .models import PlantaoTecnico, TecnicoCampo
+    
+    if request.method == 'POST':
+        tipo = request.POST.get('tipo')
+        data = request.POST.get('data')
+        tecnico_principal_id = request.POST.get('tecnico_principal')
+        tecnico_dupla_id = request.POST.get('tecnico_dupla')
+        observacoes = request.POST.get('observacoes', '')
+        
+        try:
+            tecnico_principal = TecnicoCampo.objects.get(id=tecnico_principal_id)
+            
+            plantao = PlantaoTecnico(
+                tecnico_principal=tecnico_principal,
+                data=data,
+                tipo=tipo,
+                observacoes=observacoes
+            )
+            
+            # Se for sábado, precisa da dupla
+            if tipo == 'SABADO_DUPLA':
+                if not tecnico_dupla_id:
+                    messages.error(request, '⚠️ Plantão de sábado precisa de dupla!')
+                    return redirect('cadastrar_plantao_tecnico')
+                
+                tecnico_dupla = TecnicoCampo.objects.get(id=tecnico_dupla_id)
+                plantao.tecnico_dupla = tecnico_dupla
+            
+            plantao.save()
+            messages.success(request, '✅ Plantão técnico cadastrado com sucesso!')
+            return redirect('dashboard_tecnicos')
+            
+        except Exception as e:
+            messages.error(request, f'❌ Erro: {str(e)}')
+    
+    tecnicos = TecnicoCampo.objects.filter(ativo=True).order_by('nome_completo')
+    
+    context = {
+        'tecnicos': tecnicos,
+    }
+    
+    return render(request, 'dashboard/tecnicos/cadastrar_plantao.html', context)
+
+
+@login_required
+@admin_required
+def gerar_escala_tecnicos(request):
+    """Gera escala automática para técnicos"""
+    
+    from .models import PlantaoTecnico, TecnicoCampo, EscalaAutomaticaTecnico
+    
+    if request.method == 'POST':
+        data_inicio = request.POST.get('data_inicio')
+        semanas = int(request.POST.get('semanas', 4))
+        
+        try:
+            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            
+            # Garantir que é um sábado
+            if data_inicio.weekday() != 5:  # 5 = sábado
+                dias_ate_sabado = (5 - data_inicio.weekday()) % 7
+                if dias_ate_sabado == 0:
+                    dias_ate_sabado = 7
+                data_inicio = data_inicio + timedelta(days=dias_ate_sabado)
+            
+            plantoes_criados = _criar_plantoes_tecnicos(data_inicio, semanas)
+            
+            # Salvar histórico
+            EscalaAutomaticaTecnico.objects.create(
+                criada_por=request.user,
+                data_inicio=data_inicio,
+                semanas_gerar=semanas
+            )
+            
+            messages.success(request, f'✅ Escala gerada! {plantoes_criados} plantões criados.')
+            return redirect('dashboard_tecnicos')
+            
+        except Exception as e:
+            messages.error(request, f'❌ Erro: {str(e)}')
+    
+    # Data padrão: próximo sábado
+    hoje = datetime.now().date()
+    dias_ate_sabado = (5 - hoje.weekday()) % 7
+    if dias_ate_sabado == 0:
+        dias_ate_sabado = 7
+    proximo_sabado = hoje + timedelta(days=dias_ate_sabado)
+    
+    context = {
+        'data_sugerida': proximo_sabado,
+    }
+    
+    return render(request, 'dashboard/tecnicos/gerar_escala.html', context)
+
+
+def _criar_plantoes_tecnicos(data_inicio, semanas):
+    """Lógica para criar plantões de técnicos automaticamente"""
+    
+    from .models import PlantaoTecnico, TecnicoCampo
+    
+    tecnicos = list(TecnicoCampo.objects.filter(ativo=True).order_by('ordem_fila'))
+    
+    if len(tecnicos) < 2:
+        raise ValueError('É necessário ter pelo menos 2 técnicos ativos!')
+    
+    plantoes_criados = 0
+    indice = 0
+    
+    for semana in range(semanas):
+        sabado = data_inicio + timedelta(weeks=semana)
+        domingo = sabado + timedelta(days=1)
+        
+        # SÁBADO - Dupla (14:00-18:00)
+        tec1 = tecnicos[indice % len(tecnicos)]
+        tec2 = tecnicos[(indice + 1) % len(tecnicos)]
+        
+        PlantaoTecnico.objects.create(
+            tecnico_principal=tec1,
+            tecnico_dupla=tec2,
+            data=sabado,
+            tipo='SABADO_DUPLA'
+        )
+        plantoes_criados += 1
+        
+        # DOMINGO - Solo (dia todo)
+        tec_domingo = tecnicos[(indice + 2) % len(tecnicos)]
+        
+        PlantaoTecnico.objects.create(
+            tecnico_principal=tec_domingo,
+            data=domingo,
+            tipo='DOMINGO_SOLO'
+        )
+        plantoes_criados += 1
+        
+        indice += 3  # Avança 3 posições na fila
+    
+    return plantoes_criados
+
+
+@login_required
+@admin_required
+def gerenciar_tecnicos(request):
+    """Lista todos os técnicos"""
+    
+    from .models import TecnicoCampo
+    
+    tecnicos = TecnicoCampo.objects.all().order_by('ordem_fila')
+    
+    context = {
+        'tecnicos': tecnicos,
+    }
+    
+    return render(request, 'dashboard/tecnicos/gerenciar_tecnicos.html', context)
+
+
+@login_required
+@admin_required
+def cadastrar_tecnico(request):
+    """Cadastrar novo técnico"""
+    
+    from .models import TecnicoCampo
+    
+    if request.method == 'POST':
+        nome = request.POST.get('nome_completo')
+        telefone = request.POST.get('telefone', '')
+        email = request.POST.get('email', '')
+        ordem = request.POST.get('ordem_fila', 0)
+        ativo = request.POST.get('ativo') == 'on'
+        
+        TecnicoCampo.objects.create(
+            nome_completo=nome,
+            telefone=telefone,
+            email=email,
+            ordem_fila=ordem,
+            ativo=ativo
+        )
+        
+        messages.success(request, f'✅ Técnico {nome} cadastrado!')
+        return redirect('gerenciar_tecnicos')
+    
+    ultima_ordem = TecnicoCampo.objects.count()
+    
+    context = {
+        'ordem_sugerida': ultima_ordem + 1,
+    }
+    
+    return render(request, 'dashboard/tecnicos/cadastrar_tecnico.html', context)
+
+
+@login_required
+@admin_required
+def editar_plantao_tecnico(request, plantao_id):
+    """Editar plantão de técnico"""
+    
+    from .models import PlantaoTecnico, TecnicoCampo
+    
+    plantao = get_object_or_404(PlantaoTecnico, id=plantao_id)
+    
+    if request.method == 'POST':
+        plantao.tecnico_principal_id = request.POST.get('tecnico_principal')
+        
+        if plantao.tipo == 'SABADO_DUPLA':
+            plantao.tecnico_dupla_id = request.POST.get('tecnico_dupla')
+        
+        plantao.observacoes = request.POST.get('observacoes', '')
+        plantao.save()
+        
+        messages.success(request, '✅ Plantão atualizado!')
+        return redirect('dashboard_tecnicos')
+    
+    tecnicos = TecnicoCampo.objects.filter(ativo=True)
+    
+    context = {
+        'plantao': plantao,
+        'tecnicos': tecnicos,
+    }
+    
+    return render(request, 'dashboard/tecnicos/editar_plantao.html', context)
+
+
+@login_required
+@admin_required
+def deletar_plantao_tecnico(request, plantao_id):
+    """Deletar plantão de técnico"""
+    
+    from .models import PlantaoTecnico
+    
+    plantao = get_object_or_404(PlantaoTecnico, id=plantao_id)
+    
+    if request.method == 'POST':
+        plantao.delete()
+        messages.success(request, '✅ Plantão removido!')
+        return redirect('dashboard_tecnicos')
+    
+    context = {
+        'plantao': plantao,
+    }
+    
+    return render(request, 'dashboard/tecnicos/confirmar_delete.html', context)
+
+@login_required
+@admin_required
+def editar_tecnico(request, tecnico_id):
+    """Editar técnico existente"""
+    
+    from .models import TecnicoCampo
+    
+    tecnico = get_object_or_404(TecnicoCampo, id=tecnico_id)
+    
+    if request.method == 'POST':
+        tecnico.nome_completo = request.POST.get('nome_completo')
+        tecnico.telefone = request.POST.get('telefone', '')
+        tecnico.email = request.POST.get('email', '')
+        tecnico.ordem_fila = request.POST.get('ordem_fila', 0)
+        tecnico.ativo = request.POST.get('ativo') == 'on'
+        
+        tecnico.save()
+        
+        messages.success(request, f'✅ Técnico {tecnico.nome_completo} atualizado!')
+        return redirect('gerenciar_tecnicos')
+    
+    context = {
+        'tecnico': tecnico,
+    }
+    
+    return render(request, 'dashboard/tecnicos/editar_tecnico.html', context)

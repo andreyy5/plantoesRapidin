@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerar Escala - Técnicos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
+            <i class="bi bi-magic"></i> Gerar Escala Automática - Técnicos
+        </h2>
+        <p class="text-muted">Sistema automático de distribuição de plantões</p>
+    </div>
+    <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<!-- Card Informativo -->
+<div class="card mb-4" style="border-color: rgba(59, 130, 246, 0.3);">
+    <div class="card-header" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+        <i class="bi bi-info-circle"></i> Como Funciona a Escala Automática
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <h6 style="color: #3b82f6;"><i class="bi bi-people-fill"></i> Sábado</h6>
+                <p class="mb-0 text-muted" style="font-size: 0.9rem;">
+                    <strong>Dupla</strong> - 14:00 às 18:00<br>
+                    Escalados: 2 técnicos juntos
+                </p>
+            </div>
+            <div class="col-md-4 mb-3">
+                <h6 style="color: #10b981;"><i class="bi bi-person-fill"></i> Domingo</h6>
+                <p class="mb-0 text-muted" style="font-size: 0.9rem;">
+                    <strong>Solo</strong> - Dia todo<br>
+                    Escalado: 1 técnico apenas
+                </p>
+            </div>
+            <div class="col-md-4 mb-3">
+                <h6 style="color: #ff6600;"><i class="bi bi-arrow-repeat"></i> Rotação</h6>
+                <p class="mb-0 text-muted" style="font-size: 0.9rem;">
+                    Segue a ordem da fila<br>
+                    Distribui igualmente
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Formulário -->
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="row">
+                <!-- Data Início -->
+                <div class="col-md-6 mb-3">
+                    <label for="data_inicio" class="form-label">Data de Início (Sábado)</label>
+                    <input type="date" 
+                           class="form-control" 
+                           id="data_inicio" 
+                           name="data_inicio" 
+                           value="{{ data_sugerida|date:'Y-m-d' }}"
+                           required>
+                    <small class="text-muted">
+                        <i class="bi bi-calendar"></i> Sugerido: próximo sábado
+                    </small>
+                </div>
+
+                <!-- Quantidade de Semanas -->
+                <div class="col-md-6 mb-3">
+                    <label for="semanas" class="form-label">Quantidade de Semanas</label>
+                    <select class="form-select" id="semanas" name="semanas" required>
+                        <option value="1">1 semana (2 plantões)</option>
+                        <option value="2">2 semanas (4 plantões)</option>
+                        <option value="3">3 semanas (6 plantões)</option>
+                        <option value="4" selected>4 semanas (8 plantões) ✨</option>
+                        <option value="5">5 semanas (10 plantões)</option>
+                        <option value="6">6 semanas (12 plantões)</option>
+                        <option value="8">8 semanas (16 plantões)</option>
+                        <option value="12">12 semanas (24 plantões)</option>
+                    </select>
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> Cada semana gera 2 plantões (sábado + domingo)
+                    </small>
+                </div>
+            </div>
+
+            <!-- Preview de Exemplo -->
+            <div class="alert alert-warning mb-4">
+                <h6 style="color: #fb923c;"><i class="bi bi-eye"></i> Exemplo de Distribuição (3 técnicos, 2 semanas):</h6>
+                <div class="row text-muted" style="font-size: 0.85rem;">
+                    <div class="col-md-6">
+                        <strong>Semana 1:</strong><br>
+                        • Sábado: Técnico A + B (dupla)<br>
+                        • Domingo: Técnico C (solo)
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Semana 2:</strong><br>
+                        • Sábado: Técnico C + A (dupla)<br>
+                        • Domingo: Técnico B (solo)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Avisos -->
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> <strong>Atenção:</strong>
+                <ul class="mb-0 mt-2">
+                    <li>A escala substituirá plantões existentes nas datas selecionadas</li>
+                    <li>É necessário ter pelo menos 2 técnicos ativos</li>
+                    <li>A rotação segue a ordem da fila configurada</li>
+                </ul>
+            </div>
+
+            <!-- Botões -->
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-magic"></i> Gerar Escala Automática
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

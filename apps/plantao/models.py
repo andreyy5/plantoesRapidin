@@ -236,3 +236,205 @@ class Notificacao(models.Model):
     def marcar_como_lida(self):
         self.lida = True
         self.save()
+
+# Adicione estes models ao apps/plantao/models.py
+
+class TecnicoCampo(models.Model):
+    """Modelo para Técnicos de Campo"""
+    
+    # Link com usuário (opcional)
+    user = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tecnico'
+    )
+    
+    nome_completo = models.CharField(max_length=200)
+    telefone = models.CharField(max_length=20, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    
+    # Ordem na fila de plantões
+    ordem_fila = models.IntegerField(default=0, help_text="Ordem na rotação de plantões")
+    ativo = models.BooleanField(default=True)
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Técnico de Campo"
+        verbose_name_plural = "Técnicos de Campo"
+        ordering = ['ordem_fila', 'nome_completo']
+    
+    def __str__(self):
+        return self.nome_completo
+
+
+class PlantaoTecnico(models.Model):
+    """Modelo para Plantões de Técnicos de Campo"""
+    
+    TIPO_CHOICES = [
+        ('SABADO_DUPLA', 'Sábado - Dupla (14:00-18:00)'),
+        ('DOMINGO_SOLO', 'Domingo - Solo (Dia Todo)'),
+        ('AVULSO_SOLO', 'Dia Avulso - Solo (Dia Todo)'),
+    ]
+    
+    # Técnico principal
+    tecnico_principal = models.ForeignKey(
+        TecnicoCampo,
+        on_delete=models.CASCADE,
+        related_name='plantoes_principal'
+    )
+    
+    # Técnico dupla (apenas para sábados)
+    tecnico_dupla = models.ForeignKey(
+        TecnicoCampo,
+        on_delete=models.CASCADE,
+        related_name='plantoes_dupla',
+        null=True,
+        blank=True,
+        help_text="Apenas para plantões de sábado"
+    )
+    
+    data = models.DateField()
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    
+    # Horários fixos por tipo
+    hora_inicio = models.TimeField()
+    hora_fim = models.TimeField()
+    
+    observacoes = models.TextField(blank=True, null=True)
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Plantão Técnico"
+        verbose_name_plural = "Plantões Técnicos"
+        ordering = ['data', 'hora_inicio']
+        unique_together = ['data', 'tipo']  # Não pode ter 2 plantões do mesmo tipo no mesmo dia
+    
+    def __str__(self):
+        if self.tipo == 'SABADO_DUPLA' and self.tecnico_dupla:
+            return f"{self.tecnico_principal.nome_completo} + {self.tecnico_dupla.nome_completo} - {self.data}"
+        return f"{self.tecnico_principal.nome_completo} - {self.data}"
+    
+    def save(self, *args, **kwargs):
+        # Define horários automaticamente baseado no tipo
+        if self.tipo == 'SABADO_DUPLA':
+            self.hora_inicio = datetime.strptime('14:00', '%H:%M').time()
+            self.hora_fim = datetime.strptime('18:00', '%H:%M').time()
+        else:  # DOMINGO_SOLO ou AVULSO_SOLO
+            self.hora_inicio = datetime.strptime('08:00', '%H:%M').time()
+            self.hora_fim = datetime.strptime('18:00', '%H:%M').time()
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def dia_semana(self):
+        """Retorna dia da semana em português"""
+        dias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+        return dias[self.data.weekday()]
+
+
+class TrocaPlantaoTecnico(models.Model):
+    """Sistema de troca para técnicos"""
+    
+    STATUS_CHOICES = [
+        ('PENDENTE', 'Pendente'),
+        ('ACEITA', 'Aceita'),
+        ('RECUSADA', 'Recusada'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+    
+    solicitante = models.ForeignKey(
+        TecnicoCampo,
+        on_delete=models.CASCADE,
+        related_name='trocas_tecnico_solicitadas'
+    )
+    plantao_solicitante = models.ForeignKey(
+        PlantaoTecnico,
+        on_delete=models.CASCADE,
+        related_name='troca_tecnico_origem'
+    )
+    
+    destinatario = models.ForeignKey(
+        TecnicoCampo,
+        on_delete=models.CASCADE,
+        related_name='trocas_tecnico_recebidas'
+    )
+    plantao_destinatario = models.ForeignKey(
+        PlantaoTecnico,
+        on_delete=models.CASCADE,
+        related_name='troca_tecnico_destino'
+    )
+    
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDENTE')
+    mensagem = models.TextField(blank=True, null=True)
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    respondido_em = models.DateTimeField(blank=True, null=True)
+    
+    class Meta:
+        verbose_name = "Troca de Plantão - Técnico"
+        verbose_name_plural = "Trocas de Plantões - Técnicos"
+        ordering = ['-criado_em']
+    
+    def __str__(self):
+        return f"{self.solicitante.nome_completo} ↔ {self.destinatario.nome_completo} ({self.status})"
+    
+    def aceitar_troca(self):
+        if self.status != 'PENDENTE':
+            raise ValueError('Apenas trocas pendentes podem ser aceitas')
+        
+        # Para sábados (dupla), troca apenas o técnico principal
+        temp_principal = self.plantao_solicitante.tecnico_principal
+        self.plantao_solicitante.tecnico_principal = self.plantao_destinatario.tecnico_principal
+        self.plantao_destinatario.tecnico_principal = temp_principal
+        
+        self.plantao_solicitante.save()
+        self.plantao_destinatario.save()
+        
+        self.status = 'ACEITA'
+        self.respondido_em = timezone.now()
+        self.save()
+    
+    def recusar_troca(self):
+        if self.status != 'PENDENTE':
+            raise ValueError('Apenas trocas pendentes podem ser recusadas')
+        
+        self.status = 'RECUSADA'
+        self.respondido_em = timezone.now()
+        self.save()
+    
+    def cancelar_troca(self):
+        if self.status != 'PENDENTE':
+            raise ValueError('Apenas trocas pendentes podem ser canceladas')
+        
+        self.status = 'CANCELADA'
+        self.respondido_em = timezone.now()
+        self.save()
+
+
+class EscalaAutomaticaTecnico(models.Model):
+    """Histórico de geração de escalas automáticas para técnicos"""
+    
+    criada_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    data_inicio = models.DateField(help_text="Data do primeiro sábado")
+    semanas_gerar = models.IntegerField(default=4)
+    
+    criada_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Escala Automática - Técnico"
+        verbose_name_plural = "Escalas Automáticas - Técnicos"
+        ordering = ['-criada_em']
+    
+    def __str__(self):
+        return f"Escala Técnicos - {self.data_inicio} ({self.semanas_gerar} semanas)"
+
+
+# Adicione este import no topo do arquivo se não tiver
+from django.utils import timezone
+from datetime import datetime

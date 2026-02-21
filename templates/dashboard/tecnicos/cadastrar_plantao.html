@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastrar Plantão Técnico{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
+            <i class="bi bi-calendar-plus"></i> Cadastrar Plantão Técnico
+        </h2>
+        <p class="text-muted">Adicione um novo plantão manualmente</p>
+    </div>
+    <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="row">
+                <!-- Tipo de Plantão -->
+                <div class="col-md-6 mb-3">
+                    <label for="tipo" class="form-label">Tipo de Plantão</label>
+                    <select class="form-select" id="tipo" name="tipo" required onchange="toggleDupla()">
+                        <option value="">Selecione...</option>
+                        <option value="SABADO_DUPLA">Sábado - Dupla (14:00-18:00)</option>
+                        <option value="DOMINGO_SOLO">Domingo - Solo (Dia Todo)</option>
+                        <option value="AVULSO_SOLO">Dia Avulso - Solo (Dia Todo)</option>
+                    </select>
+                    <small class="text-muted d-block mt-1">
+                        <i class="bi bi-info-circle"></i> Horários são definidos automaticamente
+                    </small>
+                </div>
+
+                <!-- Data -->
+                <div class="col-md-6 mb-3">
+                    <label for="data" class="form-label">Data</label>
+                    <input type="date" class="form-control" id="data" name="data" required>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Técnico Principal -->
+                <div class="col-md-6 mb-3">
+                    <label for="tecnico_principal" class="form-label">Técnico Principal</label>
+                    <select class="form-select" id="tecnico_principal" name="tecnico_principal" required>
+                        <option value="">Selecione...</option>
+                        {% for tecnico in tecnicos %}
+                        <option value="{{ tecnico.id }}">{{ tecnico.nome_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Técnico Dupla (apenas sábado) -->
+                <div class="col-md-6 mb-3" id="dupla-container" style="display: none;">
+                    <label for="tecnico_dupla" class="form-label">
+                        Técnico Dupla 
+                        <span class="badge bg-danger" style="font-size: 0.65rem;">Obrigatório para Sábado</span>
+                    </label>
+                    <select class="form-select" id="tecnico_dupla" name="tecnico_dupla">
+                        <option value="">Selecione...</option>
+                        {% for tecnico in tecnicos %}
+                        <option value="{{ tecnico.id }}">{{ tecnico.nome_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Observações -->
+            <div class="mb-3">
+                <label for="observacoes" class="form-label">Observações (Opcional)</label>
+                <textarea class="form-control" id="observacoes" name="observacoes" rows="3" 
+                          placeholder="Adicione observações sobre este plantão..."></textarea>
+            </div>
+
+            <!-- Botões -->
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Salvar Plantão
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleDupla() {
+    const tipo = document.getElementById('tipo').value;
+    const duplaContainer = document.getElementById('dupla-container');
+    const duplaSelect = document.getElementById('tecnico_dupla');
+    
+    if (tipo === 'SABADO_DUPLA') {
+        duplaContainer.style.display = 'block';
+        duplaSelect.required = true;
+    } else {
+        duplaContainer.style.display = 'none';
+        duplaSelect.required = false;
+        duplaSelect.value = '';
+    }
+}
+</script>
+{% endblock %}

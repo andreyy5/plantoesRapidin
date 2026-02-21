@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Colaborador, Plantao, EscalaAutomatica, TrocaPlantao, Notificacao
+from .models import Colaborador, Plantao, EscalaAutomatica, TrocaPlantao, Notificacao, TecnicoCampo, PlantaoTecnico, TrocaPlantaoTecnico, EscalaAutomaticaTecnico
 
 
 @admin.register(Colaborador)
@@ -82,3 +82,25 @@ class NotificacaoAdmin(admin.ModelAdmin):
     list_display = ['colaborador', 'tipo', 'titulo', 'lida', 'criado_em']
     list_filter = ['tipo', 'lida', 'criado_em']
     search_fields = ['colaborador__nome_completo', 'titulo']
+
+@admin.register(TecnicoCampo)
+class TecnicoCampoAdmin(admin.ModelAdmin):
+    list_display = ['nome_completo', 'telefone', 'ordem_fila', 'ativo']
+    list_filter = ['ativo']
+    search_fields = ['nome_completo', 'telefone', 'email']
+
+@admin.register(PlantaoTecnico)
+class PlantaoTecnicoAdmin(admin.ModelAdmin):
+    list_display = ['data', 'tipo', 'tecnico_principal', 'tecnico_dupla', 'hora_inicio', 'hora_fim']
+    list_filter = ['tipo', 'data']
+    search_fields = ['tecnico_principal__nome_completo', 'tecnico_dupla__nome_completo']
+
+@admin.register(TrocaPlantaoTecnico)
+class TrocaPlantaoTecnicoAdmin(admin.ModelAdmin):
+    list_display = ['solicitante', 'destinatario', 'status', 'criado_em']
+    list_filter = ['status', 'criado_em']
+
+@admin.register(EscalaAutomaticaTecnico)
+class EscalaAutomaticaTecnicoAdmin(admin.ModelAdmin):
+    list_display = ['data_inicio', 'semanas_gerar', 'criada_por', 'criada_em']
+    list_filter = ['criada_em']

@@ -30,4 +30,15 @@ urlpatterns = [
     path('colaboradores/', views.gerenciar_colaboradores, name='gerenciar_colaboradores'),
     path('colaboradores/cadastrar/', views.cadastrar_colaborador, name='cadastrar_colaborador'),
     path('colaboradores/editar/<int:colaborador_id>/', views.editar_colaborador, name='editar_colaborador'),
+
+     # ========== TÉCNICOS DE CAMPO ==========
+    path('tecnicos/', views.dashboard_tecnicos, name='dashboard_tecnicos'),
+    path('tecnicos/cadastrar/', views.cadastrar_plantao_tecnico, name='cadastrar_plantao_tecnico'),
+    path('tecnicos/editar/<int:plantao_id>/', views.editar_plantao_tecnico, name='editar_plantao_tecnico'),
+    path('tecnicos/deletar/<int:plantao_id>/', views.deletar_plantao_tecnico, name='deletar_plantao_tecnico'),
+    path('tecnicos/gerar-escala/', views.gerar_escala_tecnicos, name='gerar_escala_tecnicos'),
+    path('tecnicos/gerenciar/', views.gerenciar_tecnicos, name='gerenciar_tecnicos'),
+    path('tecnicos/cadastrar-tecnico/', views.cadastrar_tecnico, name='cadastrar_tecnico'),
+    path('tecnicos/editar-tecnico/<int:tecnico_id>/', views.editar_tecnico, name='editar_tecnico'),
+
 ]

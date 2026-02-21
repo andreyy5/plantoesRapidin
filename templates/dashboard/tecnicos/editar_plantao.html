@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Plantão Técnico{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
+            <i class="bi bi-pencil"></i> Editar Plantão Técnico
+        </h2>
+        <p class="text-muted">{{ plantao.data|date:"d/m/Y" }} - {{ plantao.get_tipo_display }}</p>
+    </div>
+    <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <!-- Info do tipo (não editável) -->
+            <div class="alert alert-info mb-4">
+                <i class="bi bi-info-circle"></i>
+                <strong>Tipo:</strong> {{ plantao.get_tipo_display }}<br>
+                <strong>Horário:</strong> {{ plantao.hora_inicio|time:"H:i" }} - {{ plantao.hora_fim|time:"H:i" }}<br>
+                <small class="text-muted">O tipo e horário não podem ser alterados. Para mudar, delete e crie um novo plantão.</small>
+            </div>
+
+            <div class="row">
+                <!-- Técnico Principal -->
+                <div class="col-md-6 mb-3">
+                    <label for="tecnico_principal" class="form-label">Técnico Principal</label>
+                    <select class="form-select" id="tecnico_principal" name="tecnico_principal" required>
+                        {% for tecnico in tecnicos %}
+                        <option value="{{ tecnico.id }}" {% if tecnico.id == plantao.tecnico_principal.id %}selected{% endif %}>
+                            {{ tecnico.nome_completo }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Técnico Dupla (se for sábado) -->
+                {% if plantao.tipo == 'SABADO_DUPLA' %}
+                <div class="col-md-6 mb-3">
+                    <label for="tecnico_dupla" class="form-label">Técnico Dupla</label>
+                    <select class="form-select" id="tecnico_dupla" name="tecnico_dupla" required>
+                        {% for tecnico in tecnicos %}
+                        <option value="{{ tecnico.id }}" {% if plantao.tecnico_dupla and tecnico.id == plantao.tecnico_dupla.id %}selected{% endif %}>
+                            {{ tecnico.nome_completo }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Observações -->
+            <div class="mb-3">
+                <label for="observacoes" class="form-label">Observações</label>
+                <textarea class="form-control" id="observacoes" name="observacoes" rows="3">{{ plantao.observacoes|default:"" }}</textarea>
+            </div>
+
+            <!-- Botões -->
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
