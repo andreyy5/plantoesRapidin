@@ -3,32 +3,65 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from datetime import datetime, timedelta
-from .models import Plantao, Colaborador, EscalaAutomatica
+from .models import Plantao, Colaborador, EscalaAutomatica, TrocaPlantao, Notificacao
 from .forms import PlantaoForm, ColaboradorForm, EscalaAutomaticaForm, FiltroPlantaoForm
 from django.http import HttpResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm
+from reportlab.lib.units import cm, inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
-from datetime import datetime, timedelta
 from django.utils import timezone
-from .models import TrocaPlantao, Notificacao
 
-# ========== FUNÇÕES AUXILIARES DE PERMISSÃO ==========
+
+# ========== FUNÇÕES AUXILIARES DE TIPO DE USUÁRIO ==========
+
+def get_user_type(user):
+    """
+    Identifica o tipo de usuário baseado no model vinculado
+    Retorna: 'admin', 'tecnico', 'colaborador' ou None
+    """
+    if not user.is_authenticated:
+        return None
+    
+    # Admin sempre é admin
+    if user.groups.filter(name='Administrador').exists() or user.is_superuser:
+        return 'admin'
+    
+    # Verificar TecnicoCampo (DEVE VIR PRIMEIRO!)
+    try:
+        from .models import TecnicoCampo
+        if hasattr(user, 'tecnico') and user.tecnico is not None:
+            return 'tecnico'
+    except:
+        pass
+    
+    # Verificar Colaborador SAC
+    try:
+        if hasattr(user, 'colaborador') and user.colaborador is not None:
+            return 'colaborador'
+    except:
+        pass
+    
+    return None
+
+
+# ========== FUNÇÕES AUXILIARES DE PERMISSÃO (MANTIDAS PARA COMPATIBILIDADE) ==========
 
 def is_admin(user):
     """Verifica se o usuário é administrador"""
     return user.groups.filter(name='Administrador').exists() or user.is_superuser
 
+
 def is_colaborador(user):
-    """Verifica se o usuário é colaborador"""
+    """Verifica se o usuário pertence ao grupo Colaborador"""
     return user.groups.filter(name='Colaborador').exists()
 
+
 def get_user_colaborador(user):
-    """Retorna o objeto Colaborador vinculado ao usuário"""
+    """Retorna o objeto Colaborador SAC vinculado ao usuário"""
     try:
         return Colaborador.objects.get(user=user)
     except Colaborador.DoesNotExist:
@@ -47,11 +80,18 @@ def admin_required(view_func):
     return wrapper
 
 
-# ========== VIEWS ==========
+# ========== VIEWS SAC ==========
 
 @login_required
 def dashboard(request):
-    """Dashboard principal - mostra plantões de acordo com permissão"""
+    """Dashboard SAC - redireciona técnicos"""
+    
+    user_type = get_user_type(request.user)
+    
+    # 🔴 CRÍTICO: Se for técnico, redireciona para dashboard de técnicos
+    if user_type == 'tecnico':
+        messages.warning(request, '⚠️ Você é um técnico de campo.')
+        return redirect('dashboard_tecnicos')
     
     # Filtros
     filtro_form = FiltroPlantaoForm(request.GET or None)
@@ -62,8 +102,8 @@ def dashboard(request):
     # Buscar colaborador do usuário logado
     colaborador_user = get_user_colaborador(request.user)
     
-    # Se for colaborador (e não admin), mostra APENAS seus plantões
-    if is_colaborador(request.user) and not is_admin(request.user):
+    # Se for colaborador SAC (não admin), mostra APENAS seus plantões
+    if user_type == 'colaborador':
         if colaborador_user:
             plantoes = plantoes.filter(colaborador=colaborador_user)
         else:
@@ -119,8 +159,9 @@ def dashboard(request):
         'total_plantoes': plantoes.count(),
         'colaboradores_count': colaboradores_count,
         'is_admin': is_admin(request.user),
-        'is_colaborador': is_colaborador(request.user),
-        'colaborador_logado': colaborador_user,  # ← objeto Colaborador do usuário logado
+        'is_colaborador': user_type == 'colaborador',
+        'colaborador_logado': colaborador_user,
+        'user_type': user_type,
     }
     
     return render(request, 'dashboard/home.html', context)
@@ -336,16 +377,13 @@ def editar_colaborador(request, colaborador_id):
     return render(request, 'dashboard/cadastrar_colaborador.html', context)
 
 
-# ========== Exportar pdf ==========
+# ========== EXPORTAR PDF SAC ==========
 
 @login_required
 def exportar_pdf(request):
-    """Exporta plantões em PDF - todos (admin) ou apenas do usuário (colaborador)"""
+    """Exporta plantões SAC em PDF"""
     
-    # Buffer para o PDF
     buffer = BytesIO()
-    
-    # Criar documento PDF em paisagem
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
@@ -355,11 +393,9 @@ def exportar_pdf(request):
         bottomMargin=1.5*cm
     )
     
-    # Container para elementos do PDF
     elements = []
-    
-    # Estilos
     styles = getSampleStyleSheet()
+    
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
@@ -378,7 +414,6 @@ def exportar_pdf(request):
         spaceAfter=30
     )
     
-    # Buscar plantões
     hoje = datetime.now().date()
     data_fim = hoje + timedelta(weeks=4)
     plantoes = Plantao.objects.select_related('colaborador').filter(
@@ -386,8 +421,9 @@ def exportar_pdf(request):
         data__lte=data_fim
     ).order_by('data', 'hora_inicio')
     
-    # Filtrar por colaborador se necessário
-    if is_colaborador(request.user) and not is_admin(request.user):
+    user_type = get_user_type(request.user)
+    
+    if user_type == 'colaborador':
         colaborador = get_user_colaborador(request.user)
         if colaborador:
             plantoes = plantoes.filter(colaborador=colaborador)
@@ -398,7 +434,6 @@ def exportar_pdf(request):
     else:
         titulo = "Escala de Plantões - Todos os Colaboradores"
     
-    # Título
     elements.append(Paragraph(titulo, title_style))
     elements.append(Paragraph(
         f"Período: {hoje.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}",
@@ -411,7 +446,6 @@ def exportar_pdf(request):
             styles['Normal']
         ))
     else:
-        # Agrupar por semana
         plantoes_por_semana = {}
         for plantao in plantoes:
             inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
@@ -425,9 +459,7 @@ def exportar_pdf(request):
                 }
             plantoes_por_semana[semana_key]['plantoes'].append(plantao)
         
-        # Criar tabelas por semana
         for semana_key, semana_data in sorted(plantoes_por_semana.items()):
-            # Cabeçalho da semana
             semana_style = ParagraphStyle(
                 'SemanaHeader',
                 parent=styles['Heading2'],
@@ -442,7 +474,6 @@ def exportar_pdf(request):
                 semana_style
             ))
             
-            # Dados da tabela
             data = [
                 ['Data', 'Dia', 'Turno', 'Horário', 'Colaborador', 'Observações']
             ]
@@ -457,35 +488,24 @@ def exportar_pdf(request):
                     plantao.observacoes[:30] + '...' if plantao.observacoes and len(plantao.observacoes) > 30 else plantao.observacoes or '--'
                 ])
             
-            # Criar tabela
             table = Table(data, colWidths=[3*cm, 2.5*cm, 4*cm, 3.5*cm, 5*cm, 5*cm])
             
-            # Estilo da tabela
             table.setStyle(TableStyle([
-                # Cabeçalho
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ff6600')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 10),
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
-                
-                # Corpo
                 ('BACKGROUND', (0, 1), (-1, -1), colors.white),
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 9),
                 ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
                 ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
-                
-                # Bordas
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                 ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#ff6600')),
-                
-                # Alternância de cores
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fff4e6')]),
-                
-                # Padding
                 ('TOPPADDING', (0, 0), (-1, -1), 8),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
                 ('LEFTPADDING', (0, 0), (-1, -1), 8),
@@ -495,7 +515,6 @@ def exportar_pdf(request):
             elements.append(table)
             elements.append(Spacer(1, 0.5*cm))
     
-    # Rodapé
     footer_style = ParagraphStyle(
         'Footer',
         parent=styles['Normal'],
@@ -509,34 +528,29 @@ def exportar_pdf(request):
         footer_style
     ))
     
-    # Construir PDF
     doc.build(elements)
-    
-    # Retornar response
     buffer.seek(0)
-    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     
-    filename = f"plantoes_{hoje.strftime('%Y%m%d')}.pdf"
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    filename = f"plantoes_sac_{hoje.strftime('%Y%m%d')}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
     return response
 
-# ========== TROCA DE PLANTÃO ==========
+
+# ========== TROCA DE PLANTÃO SAC ==========
 
 @login_required
 def solicitar_troca(request, plantao_id):
     """Permite colaborador solicitar troca de plantão"""
     
-    # Buscar plantão do solicitante
     meu_plantao = get_object_or_404(Plantao, id=plantao_id)
-    
-    # Verificar se é o dono do plantão
     colaborador_solicitante = get_user_colaborador(request.user)
+    
     if not colaborador_solicitante or meu_plantao.colaborador != colaborador_solicitante:
         messages.error(request, '❌ Você só pode solicitar troca dos seus próprios plantões!')
         return redirect('dashboard')
     
-    # Não pode trocar plantões passados
     if meu_plantao.data < datetime.now().date():
         messages.error(request, '⏰ Não é possível trocar plantões que já passaram!')
         return redirect('dashboard')
@@ -547,12 +561,10 @@ def solicitar_troca(request, plantao_id):
         
         plantao_destino = get_object_or_404(Plantao, id=plantao_destino_id)
         
-        # Validações
         if plantao_destino.colaborador == colaborador_solicitante:
             messages.error(request, '❌ Você não pode trocar com você mesmo!')
             return redirect('solicitar_troca', plantao_id=plantao_id)
         
-        # Verificar se já existe uma solicitação pendente
         troca_existente = TrocaPlantao.objects.filter(
             solicitante=colaborador_solicitante,
             plantao_solicitante=meu_plantao,
@@ -564,7 +576,6 @@ def solicitar_troca(request, plantao_id):
             messages.warning(request, '⚠️ Você já tem uma solicitação de troca pendente para este plantão!')
             return redirect('dashboard')
         
-        # Criar solicitação de troca
         troca = TrocaPlantao.objects.create(
             solicitante=colaborador_solicitante,
             plantao_solicitante=meu_plantao,
@@ -574,7 +585,6 @@ def solicitar_troca(request, plantao_id):
             status='PENDENTE'
         )
         
-        # Criar notificação para o destinatário
         Notificacao.objects.create(
             colaborador=plantao_destino.colaborador,
             tipo='TROCA_SOLICITADA',
@@ -586,7 +596,6 @@ def solicitar_troca(request, plantao_id):
         messages.success(request, f'✅ Solicitação de troca enviada para {plantao_destino.colaborador.nome_completo}!')
         return redirect('minhas_trocas')
     
-    # Buscar plantões disponíveis para troca (futuros, de outros colaboradores)
     hoje = datetime.now().date()
     plantoes_disponiveis = Plantao.objects.select_related('colaborador').filter(
         data__gte=hoje
@@ -611,14 +620,12 @@ def minhas_trocas(request):
         messages.error(request, '❌ Você precisa estar vinculado a um colaborador!')
         return redirect('dashboard')
     
-    # Trocas solicitadas por mim
     trocas_solicitadas = TrocaPlantao.objects.filter(
         solicitante=colaborador
     ).select_related(
         'destinatario', 'plantao_solicitante', 'plantao_destinatario'
     ).order_by('-criado_em')
     
-    # Trocas que recebi
     trocas_recebidas = TrocaPlantao.objects.filter(
         destinatario=colaborador,
         status='PENDENTE'
@@ -641,12 +648,10 @@ def responder_troca(request, troca_id, acao):
     troca = get_object_or_404(TrocaPlantao, id=troca_id)
     colaborador = get_user_colaborador(request.user)
     
-    # Verificar se é o destinatário da troca
     if troca.destinatario != colaborador:
         messages.error(request, '❌ Você não pode responder esta solicitação!')
         return redirect('minhas_trocas')
     
-    # Verificar se ainda está pendente
     if troca.status != 'PENDENTE':
         messages.warning(request, '⚠️ Esta solicitação já foi respondida!')
         return redirect('minhas_trocas')
@@ -655,7 +660,6 @@ def responder_troca(request, troca_id, acao):
         if acao == 'aceitar':
             troca.aceitar_troca()
             
-            # Notificar o solicitante
             Notificacao.objects.create(
                 colaborador=troca.solicitante,
                 tipo='TROCA_ACEITA',
@@ -669,7 +673,6 @@ def responder_troca(request, troca_id, acao):
         elif acao == 'recusar':
             troca.recusar_troca()
             
-            # Notificar o solicitante
             Notificacao.objects.create(
                 colaborador=troca.solicitante,
                 tipo='TROCA_RECUSADA',
@@ -693,12 +696,10 @@ def cancelar_troca(request, troca_id):
     troca = get_object_or_404(TrocaPlantao, id=troca_id)
     colaborador = get_user_colaborador(request.user)
     
-    # Verificar se é o solicitante
     if troca.solicitante != colaborador:
         messages.error(request, '❌ Você não pode cancelar esta solicitação!')
         return redirect('minhas_trocas')
     
-    # Verificar se ainda está pendente
     if troca.status != 'PENDENTE':
         messages.warning(request, '⚠️ Não é possível cancelar esta solicitação!')
         return redirect('minhas_trocas')
@@ -706,7 +707,6 @@ def cancelar_troca(request, troca_id):
     try:
         troca.cancelar_troca()
         
-        # Notificar o destinatário
         Notificacao.objects.create(
             colaborador=troca.destinatario,
             tipo='TROCA_CANCELADA',
@@ -731,12 +731,10 @@ def notificacoes(request):
     if not colaborador:
         return redirect('dashboard')
     
-    # Buscar notificações
     todas_notificacoes = Notificacao.objects.filter(
         colaborador=colaborador
     ).select_related('troca').order_by('-criado_em')
     
-    # Marcar como lidas se solicitado
     if request.method == 'POST':
         notif_id = request.POST.get('notificacao_id')
         if notif_id:
@@ -766,9 +764,8 @@ def marcar_notificacao_lida(request, notif_id):
     return redirect('notificacoes')
 
 
-# Context processor para adicionar notificações não lidas em todos os templates
 def notificacoes_processor(request):
-    """Adiciona contagem de notificações não lidas ao contexto"""
+    """Context processor para adicionar notificações não lidas"""
     if request.user.is_authenticated:
         colaborador = get_user_colaborador(request.user)
         if colaborador:
@@ -780,21 +777,25 @@ def notificacoes_processor(request):
     return {'notificacoes_nao_lidas': 0}
 
 
-# Adicione estas views ao apps/plantao/views.py
-
-# ========== VIEWS PARA TÉCNICOS DE CAMPO ==========
+# ========== VIEWS TÉCNICOS DE CAMPO ==========
 
 @login_required
 def dashboard_tecnicos(request):
-    """Dashboard de plantões de técnicos"""
+    """Dashboard de plantões de técnicos - redireciona colaboradores SAC"""
     
     from .models import PlantaoTecnico, TecnicoCampo
     
-    # Query base
+    user_type = get_user_type(request.user)
+    
+    # 🔴 CRÍTICO: Se for colaborador SAC, redireciona para dashboard SAC
+    if user_type == 'colaborador':
+        messages.warning(request, '⚠️ Você é um colaborador SAC.')
+        return redirect('dashboard')
+    
     plantoes = PlantaoTecnico.objects.select_related('tecnico_principal', 'tecnico_dupla').all()
     
     # Se for técnico (não admin), mostra apenas seus plantões
-    if is_colaborador(request.user) and not is_admin(request.user):
+    if user_type == 'tecnico':
         try:
             tecnico = TecnicoCampo.objects.get(user=request.user)
             plantoes = plantoes.filter(
@@ -802,13 +803,12 @@ def dashboard_tecnicos(request):
             )
         except TecnicoCampo.DoesNotExist:
             plantoes = PlantaoTecnico.objects.none()
+            messages.info(request, 'ℹ️ Você ainda não está vinculado a um técnico.')
     
-    # Filtrar próximas 4 semanas
     hoje = datetime.now().date()
     data_fim = hoje + timedelta(weeks=4)
     plantoes = plantoes.filter(data__gte=hoje, data__lte=data_fim)
     
-    # Agrupar por semana
     plantoes_agrupados = {}
     for plantao in plantoes:
         inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
@@ -829,10 +829,176 @@ def dashboard_tecnicos(request):
         'total_plantoes': plantoes.count(),
         'tecnicos_count': TecnicoCampo.objects.filter(ativo=True).count(),
         'is_admin': is_admin(request.user),
-        'is_colaborador': is_colaborador(request.user),
+        'is_tecnico': user_type == 'tecnico',
+        'user_type': user_type,
     }
     
     return render(request, 'dashboard/tecnicos/home.html', context)
+
+
+@login_required
+def exportar_pdf_tecnicos(request):
+    """Exporta plantões técnicos em PDF"""
+    
+    from .models import PlantaoTecnico, TecnicoCampo
+    from django.db.models import Q  # ← ADICIONAR
+    
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="plantoes_tecnicos_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    
+    doc = SimpleDocTemplate(response, pagesize=landscape(A4),
+                           topMargin=0.5*inch, bottomMargin=0.5*inch,
+                           leftMargin=0.5*inch, rightMargin=0.5*inch)
+    
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#ff6600'),
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.grey,
+        spaceAfter=20,
+        alignment=TA_CENTER
+    )
+    
+    elements.append(Paragraph("ESCALA DE PLANTÕES - TÉCNICOS DE CAMPO", title_style))
+    elements.append(Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", subtitle_style))
+    
+    plantoes = PlantaoTecnico.objects.select_related('tecnico_principal', 'tecnico_dupla').all()
+    
+    user_type = get_user_type(request.user)
+    
+    # Filtrar se não for admin
+    if user_type == 'tecnico':
+        try:
+            tecnico = TecnicoCampo.objects.get(user=request.user)
+            plantoes = plantoes.filter(
+                Q(tecnico_principal=tecnico) | Q(tecnico_dupla=tecnico)
+            )
+        except TecnicoCampo.DoesNotExist:
+            plantoes = PlantaoTecnico.objects.none()
+    
+    hoje = datetime.now().date()
+    data_fim = hoje + timedelta(weeks=4)
+    plantoes = plantoes.filter(data__gte=hoje, data__lte=data_fim).order_by('data', 'hora_inicio')
+    
+    plantoes_agrupados = {}
+    for plantao in plantoes:
+        inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
+        semana_key = inicio_semana.strftime('%Y-%m-%d')
+        
+        if semana_key not in plantoes_agrupados:
+            plantoes_agrupados[semana_key] = {
+                'inicio': inicio_semana,
+                'fim': inicio_semana + timedelta(days=6),
+                'plantoes': []
+            }
+        plantoes_agrupados[semana_key]['plantoes'].append(plantao)
+    
+    for semana_key in sorted(plantoes_agrupados.keys()):
+        semana = plantoes_agrupados[semana_key]
+        
+        semana_style = ParagraphStyle(
+            'SemanaStyle',
+            parent=styles['Heading2'],
+            fontSize=12,
+            textColor=colors.HexColor('#ff6600'),
+            spaceAfter=10,
+            spaceBefore=15,
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold'
+        )
+        
+        semana_text = f"Semana de {semana['inicio'].strftime('%d/%m/%Y')} a {semana['fim'].strftime('%d/%m/%Y')}"
+        elements.append(Paragraph(semana_text, semana_style))
+        
+        data = [['Data', 'Dia', 'Tipo', 'Horário', 'Técnico(s)', 'Obs']]
+        
+        for plantao in semana['plantoes']:
+            tipo_map = {
+                'SABADO_DUPLA': 'Dupla',
+                'DOMINGO_SOLO': 'Solo',
+                'AVULSO_SOLO': 'Avulso'
+            }
+            tipo = tipo_map.get(plantao.tipo, plantao.get_tipo_display())
+            
+            if plantao.tecnico_dupla:
+                tecnicos = f"{plantao.tecnico_principal.nome_completo}\n+ {plantao.tecnico_dupla.nome_completo}"
+            else:
+                tecnicos = plantao.tecnico_principal.nome_completo
+            
+            dias = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+            dia = dias[plantao.data.weekday()]
+            
+            data.append([
+                plantao.data.strftime('%d/%m'),
+                dia,
+                tipo,
+                f"{plantao.hora_inicio.strftime('%H:%M')}-{plantao.hora_fim.strftime('%H:%M')}",
+                tecnicos,
+                plantao.observacoes[:30] + '...' if plantao.observacoes and len(plantao.observacoes) > 30 else (plantao.observacoes or '--')
+            ])
+        
+        table = Table(data, colWidths=[0.8*inch, 0.7*inch, 1*inch, 1.2*inch, 2.5*inch, 1.8*inch])
+        
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ff6600')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('TOPPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
+        ]))
+        
+        elements.append(table)
+        elements.append(Spacer(1, 0.2*inch))
+    
+    if not plantoes_agrupados:
+        no_data_style = ParagraphStyle(
+            'NoDataStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.grey,
+            alignment=TA_CENTER
+        )
+        elements.append(Spacer(1, 1*inch))
+        elements.append(Paragraph("Nenhum plantão encontrado para o período selecionado.", no_data_style))
+    
+    footer_style = ParagraphStyle(
+        'FooterStyle',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.grey,
+        alignment=TA_CENTER,
+        spaceBefore=30
+    )
+    elements.append(Spacer(1, 0.5*inch))
+    elements.append(Paragraph("Sistema de Plantões Rapidin - Técnicos de Campo", footer_style))
+    
+    doc.build(elements)
+    
+    return response
 
 
 @login_required
@@ -859,7 +1025,6 @@ def cadastrar_plantao_tecnico(request):
                 observacoes=observacoes
             )
             
-            # Se for sábado, precisa da dupla
             if tipo == 'SABADO_DUPLA':
                 if not tecnico_dupla_id:
                     messages.error(request, '⚠️ Plantão de sábado precisa de dupla!')
@@ -898,8 +1063,7 @@ def gerar_escala_tecnicos(request):
         try:
             data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
             
-            # Garantir que é um sábado
-            if data_inicio.weekday() != 5:  # 5 = sábado
+            if data_inicio.weekday() != 5:
                 dias_ate_sabado = (5 - data_inicio.weekday()) % 7
                 if dias_ate_sabado == 0:
                     dias_ate_sabado = 7
@@ -907,7 +1071,6 @@ def gerar_escala_tecnicos(request):
             
             plantoes_criados = _criar_plantoes_tecnicos(data_inicio, semanas)
             
-            # Salvar histórico
             EscalaAutomaticaTecnico.objects.create(
                 criada_por=request.user,
                 data_inicio=data_inicio,
@@ -920,7 +1083,6 @@ def gerar_escala_tecnicos(request):
         except Exception as e:
             messages.error(request, f'❌ Erro: {str(e)}')
     
-    # Data padrão: próximo sábado
     hoje = datetime.now().date()
     dias_ate_sabado = (5 - hoje.weekday()) % 7
     if dias_ate_sabado == 0:
@@ -951,7 +1113,6 @@ def _criar_plantoes_tecnicos(data_inicio, semanas):
         sabado = data_inicio + timedelta(weeks=semana)
         domingo = sabado + timedelta(days=1)
         
-        # SÁBADO - Dupla (14:00-18:00)
         tec1 = tecnicos[indice % len(tecnicos)]
         tec2 = tecnicos[(indice + 1) % len(tecnicos)]
         
@@ -963,7 +1124,6 @@ def _criar_plantoes_tecnicos(data_inicio, semanas):
         )
         plantoes_criados += 1
         
-        # DOMINGO - Solo (dia todo)
         tec_domingo = tecnicos[(indice + 2) % len(tecnicos)]
         
         PlantaoTecnico.objects.create(
@@ -973,7 +1133,7 @@ def _criar_plantoes_tecnicos(data_inicio, semanas):
         )
         plantoes_criados += 1
         
-        indice += 3  # Avança 3 posições na fila
+        indice += 3
     
     return plantoes_criados
 
@@ -1078,6 +1238,7 @@ def deletar_plantao_tecnico(request, plantao_id):
     }
     
     return render(request, 'dashboard/tecnicos/confirmar_delete.html', context)
+
 
 @login_required
 @admin_required
