@@ -40,5 +40,6 @@ urlpatterns = [
     path('tecnicos/gerenciar/', views.gerenciar_tecnicos, name='gerenciar_tecnicos'),
     path('tecnicos/cadastrar-tecnico/', views.cadastrar_tecnico, name='cadastrar_tecnico'),
     path('tecnicos/editar-tecnico/<int:tecnico_id>/', views.editar_tecnico, name='editar_tecnico'),
+    path('tecnicos/exportar-pdf/', views.exportar_pdf_tecnicos, name='exportar_pdf_tecnicos'),
 
 ]

@@ -841,7 +841,6 @@ def exportar_pdf_tecnicos(request):
     """Exporta plantões técnicos em PDF"""
     
     from .models import PlantaoTecnico, TecnicoCampo
-    from django.db.models import Q  # ← ADICIONAR
     
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="plantoes_tecnicos_{datetime.now().strftime("%Y%m%d")}.pdf"'
@@ -875,11 +874,13 @@ def exportar_pdf_tecnicos(request):
     elements.append(Paragraph("ESCALA DE PLANTÕES - TÉCNICOS DE CAMPO", title_style))
     elements.append(Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", subtitle_style))
     
+    # Buscar plantões
     plantoes = PlantaoTecnico.objects.select_related('tecnico_principal', 'tecnico_dupla').all()
     
+    # Verificar tipo de usuário
     user_type = get_user_type(request.user)
     
-    # Filtrar se não for admin
+    # 🔴 CORREÇÃO: Se for técnico (não admin), filtrar apenas seus plantões
     if user_type == 'tecnico':
         try:
             tecnico = TecnicoCampo.objects.get(user=request.user)
@@ -889,10 +890,12 @@ def exportar_pdf_tecnicos(request):
         except TecnicoCampo.DoesNotExist:
             plantoes = PlantaoTecnico.objects.none()
     
+    # Filtrar próximas 4 semanas
     hoje = datetime.now().date()
     data_fim = hoje + timedelta(weeks=4)
     plantoes = plantoes.filter(data__gte=hoje, data__lte=data_fim).order_by('data', 'hora_inicio')
     
+    # Agrupar por semana
     plantoes_agrupados = {}
     for plantao in plantoes:
         inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
@@ -906,6 +909,7 @@ def exportar_pdf_tecnicos(request):
             }
         plantoes_agrupados[semana_key]['plantoes'].append(plantao)
     
+    # Gerar tabelas por semana
     for semana_key in sorted(plantoes_agrupados.keys()):
         semana = plantoes_agrupados[semana_key]
         
@@ -923,23 +927,31 @@ def exportar_pdf_tecnicos(request):
         semana_text = f"Semana de {semana['inicio'].strftime('%d/%m/%Y')} a {semana['fim'].strftime('%d/%m/%Y')}"
         elements.append(Paragraph(semana_text, semana_style))
         
+        # Cabeçalho da tabela
         data = [['Data', 'Dia', 'Tipo', 'Horário', 'Técnico(s)', 'Obs']]
         
+        # Linhas da tabela
         for plantao in semana['plantoes']:
+            # Mapear tipos
             tipo_map = {
                 'SABADO_DUPLA': 'Dupla',
                 'DOMINGO_SOLO': 'Solo',
                 'AVULSO_SOLO': 'Avulso'
             }
-            tipo = tipo_map.get(plantao.tipo, plantao.get_tipo_display())
+            tipo = tipo_map.get(plantao.tipo, 'Desconhecido')
             
+            # Técnicos (nome + dupla se houver)
             if plantao.tecnico_dupla:
                 tecnicos = f"{plantao.tecnico_principal.nome_completo}\n+ {plantao.tecnico_dupla.nome_completo}"
             else:
                 tecnicos = plantao.tecnico_principal.nome_completo
             
+            # Dia da semana
             dias = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
             dia = dias[plantao.data.weekday()]
+            
+            # Observações truncadas
+            obs = plantao.observacoes[:30] + '...' if plantao.observacoes and len(plantao.observacoes) > 30 else (plantao.observacoes or '--')
             
             data.append([
                 plantao.data.strftime('%d/%m'),
@@ -947,18 +959,23 @@ def exportar_pdf_tecnicos(request):
                 tipo,
                 f"{plantao.hora_inicio.strftime('%H:%M')}-{plantao.hora_fim.strftime('%H:%M')}",
                 tecnicos,
-                plantao.observacoes[:30] + '...' if plantao.observacoes and len(plantao.observacoes) > 30 else (plantao.observacoes or '--')
+                obs
             ])
         
+        # Criar tabela
         table = Table(data, colWidths=[0.8*inch, 0.7*inch, 1*inch, 1.2*inch, 2.5*inch, 1.8*inch])
         
+        # Estilizar tabela
         table.setStyle(TableStyle([
+            # Cabeçalho
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ff6600')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            
+            # Corpo
             ('BACKGROUND', (0, 1), (-1, -1), colors.white),
             ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
             ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
@@ -966,14 +983,19 @@ def exportar_pdf_tecnicos(request):
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('TOPPADDING', (0, 1), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+            
+            # Grade e bordas
             ('GRID', (0, 0), (-1, -1), 1, colors.grey),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            
+            # Linhas alternadas
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
         ]))
         
         elements.append(table)
         elements.append(Spacer(1, 0.2*inch))
     
+    # Se não houver plantões
     if not plantoes_agrupados:
         no_data_style = ParagraphStyle(
             'NoDataStyle',
@@ -985,6 +1007,7 @@ def exportar_pdf_tecnicos(request):
         elements.append(Spacer(1, 1*inch))
         elements.append(Paragraph("Nenhum plantão encontrado para o período selecionado.", no_data_style))
     
+    # Rodapé
     footer_style = ParagraphStyle(
         'FooterStyle',
         parent=styles['Normal'],
@@ -996,6 +1019,7 @@ def exportar_pdf_tecnicos(request):
     elements.append(Spacer(1, 0.5*inch))
     elements.append(Paragraph("Sistema de Plantões Rapidin - Técnicos de Campo", footer_style))
     
+    # Gerar PDF
     doc.build(elements)
     
     return response

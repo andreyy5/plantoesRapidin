@@ -528,9 +528,13 @@
                     
                     <hr class="text-white-50 mx-3">
                     
-                    <a class="nav-link" href="{% url 'logout' %}">
+                <form method="post" action="{% url 'logout' %}" class="m-0 p-0">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-link btn btn-link p-0 border-0">
                         <i class="bi bi-box-arrow-right"></i> Sair
-                    </a>
+                    </button>
+                </form>
+                
                 </nav>
             </div>
             

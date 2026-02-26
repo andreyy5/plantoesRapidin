@@ -17,9 +17,12 @@
         </p>
     </div>
     <div>
+        {# Botão PDF - SEMPRE aparece (admin e colaborador) #}
         <a href="{% url 'exportar_pdf' %}" class="btn btn-secondary me-2">
             <i class="bi bi-file-earmark-pdf"></i> Exportar PDF
         </a>
+        
+        {# Botões de gerenciamento - APENAS para admin #}
         {% if is_admin %}
         <a href="{% url 'cadastrar_plantao' %}" class="btn btn-primary me-2">
             <i class="bi bi-plus-circle"></i> Novo Plantão
