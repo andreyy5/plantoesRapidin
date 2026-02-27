@@ -129,10 +129,10 @@ def dashboard(request):
         if dia_semana:
             plantoes = plantoes.filter(dia_semana=dia_semana)
     else:
-        # Por padrão, mostrar plantões das próximas 4 semanas
         hoje = datetime.now().date()
-        data_fim_padrao = hoje + timedelta(weeks=4)
-        plantoes = plantoes.filter(data__gte=hoje, data__lte=data_fim_padrao)
+        inicio_semana_atual = hoje - timedelta(days=hoje.weekday())  # ← Calcula segunda-feira
+        data_fim = inicio_semana_atual + timedelta(weeks=8) - timedelta(days=1)  # ← 8 semanas completas
+        plantoes = plantoes.filter(data__gte=inicio_semana_atual, data__lte=data_fim)
     
     # Agrupar plantões por semana
     plantoes_agrupados = {}
@@ -805,10 +805,51 @@ def dashboard_tecnicos(request):
             plantoes = PlantaoTecnico.objects.none()
             messages.info(request, 'ℹ️ Você ainda não está vinculado a um técnico.')
     
-    hoje = datetime.now().date()
-    data_fim = hoje + timedelta(weeks=4)
-    plantoes = plantoes.filter(data__gte=hoje, data__lte=data_fim)
+    # ===== APLICAR FILTROS (Admin apenas) =====
+    filtros_aplicados = False
     
+    if is_admin(request.user):
+        data_inicio_filtro = request.GET.get('data_inicio')
+        data_fim_filtro = request.GET.get('data_fim')
+        tipo_filtro = request.GET.get('tipo')
+        
+        if data_inicio_filtro:
+            try:
+                data_inicio_filtro = datetime.strptime(data_inicio_filtro, '%Y-%m-%d').date()
+                plantoes = plantoes.filter(data__gte=data_inicio_filtro)
+                filtros_aplicados = True
+            except:
+                pass
+        
+        if data_fim_filtro:
+            try:
+                data_fim_filtro = datetime.strptime(data_fim_filtro, '%Y-%m-%d').date()
+                plantoes = plantoes.filter(data__lte=data_fim_filtro)
+                filtros_aplicados = True
+            except:
+                pass
+        
+        if tipo_filtro:
+            plantoes = plantoes.filter(tipo=tipo_filtro)
+            filtros_aplicados = True
+    
+    # ===== FILTRO PADRÃO (apenas se NÃO houver filtros manuais) =====
+    # 🔧 CORREÇÃO DO BUG: Começar do início da SEMANA ATUAL, não de hoje!
+    if not filtros_aplicados:
+        hoje = datetime.now().date()
+        
+        # Calcular início da semana atual (segunda-feira = dia 0)
+        inicio_semana_atual = hoje - timedelta(days=hoje.weekday())
+        
+        # Mostrar desde o início da semana atual até 8 semanas completas
+        data_fim = inicio_semana_atual + timedelta(weeks=8) - timedelta(days=1)
+        
+        plantoes = plantoes.filter(data__gte=inicio_semana_atual, data__lte=data_fim)
+    
+    # Ordenar por data
+    plantoes = plantoes.order_by('data', 'hora_inicio')
+    
+    # Agrupar por semana
     plantoes_agrupados = {}
     for plantao in plantoes:
         inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
