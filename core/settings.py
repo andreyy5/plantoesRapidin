@@ -26,8 +26,7 @@ SECRET_KEY = 'django-insecure-q14%f-n55+=kii+f^5c^*c3quuf2fa5pz1py0im!7r%$$(1s9c
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    'plantoes.rapidin.net.br',
-    '3.234.2.8'
+    '*'
 ]
 
 
