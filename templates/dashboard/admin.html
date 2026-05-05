@@ -1,7 +1,7 @@
-<h1>Dashboard Administrador</h1>
-<p>Bem-vindo, {{ request.user.username }}</p>
-<form method="post" action="{% url 'logout' %}">
-    {% csrf_token %}
-    <button type="submit">Sair</button>
-</form>
-
+{% extends 'base.html' %}
+{% block title %}Dashboard Admin - Rapidin Plantões{% endblock %}
+{% block content %}
+<div class="text-center py-10">
+  <p class="text-sm text-gray-400">Redirecionando...</p>
+</div>
+{% endblock %}

@@ -1,212 +1,185 @@
 {% extends 'base.html' %}
-
-{% block title %}Dashboard - Sistema de Plantões{% endblock %}
+{% block title %}Dashboard - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
-            <i class="bi bi-calendar-week"></i> Dashboard de Plantões
-        </h2>
-        <p class="text-muted">
-            {% if is_colaborador and not is_admin %}
-                Visualize seus plantões escalados
-            {% else %}
-                Visualize e gerencie os plantões escalados
-            {% endif %}
-        </p>
-    </div>
-    <div>
-        {# Botão PDF - SEMPRE aparece (admin e colaborador) #}
-        <a href="{% url 'exportar_pdf' %}" class="btn btn-secondary me-2">
-            <i class="bi bi-file-earmark-pdf"></i> Exportar PDF
-        </a>
-        
-        {# Botões de gerenciamento - APENAS para admin #}
-        {% if is_admin %}
-        <a href="{% url 'cadastrar_plantao' %}" class="btn btn-primary me-2">
-            <i class="bi bi-plus-circle"></i> Novo Plantão
-        </a>
-        <a href="{% url 'gerar_escala' %}" class="btn btn-success">
-            <i class="bi bi-magic"></i> Gerar Escala
-        </a>
-        {% endif %}
-    </div>
+{% load tz %}
+{% now "Y-m-d" as today %}
+
+<!-- Cabeçalho -->
+<div class="flex items-center justify-between flex-wrap gap-3">
+  <div>
+    <h1 class="text-lg font-bold text-[#50443C]">Dashboard de Plantões</h1>
+    <p class="text-xs text-gray-400 font-medium mt-0.5">
+      {% if is_colaborador and not is_admin %}Visualize seus plantões escalados{% else %}Visualize e gerencie os plantões escalados{% endif %}
+    </p>
+  </div>
+  <div class="flex items-center gap-2 flex-wrap">
+    <a href="{% url 'exportar_pdf' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      Exportar PDF
+    </a>
+    {% if is_admin %}
+    <a href="{% url 'cadastrar_plantao' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Novo Plantão
+    </a>
+    <a href="{% url 'gerar_escala' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      Gerar Escala
+    </a>
+    {% endif %}
+  </div>
 </div>
 
 <!-- Filtros -->
-<div class="card mb-4">
-    <div class="card-body">
-        <h5 class="card-title mb-3"><i class="bi bi-funnel"></i> Filtros</h5>
-        <form method="get" class="row g-3">
-            <div class="col-md-3">
-                {{ filtro_form.data_inicio }}
-            </div>
-            <div class="col-md-3">
-                {{ filtro_form.data_fim }}
-            </div>
-            {% if is_admin %}
-            <div class="col-md-3">
-                {{ filtro_form.colaborador }}
-            </div>
-            <div class="col-md-2">
-                {{ filtro_form.dia_semana }}
-            </div>
-            <div class="col-md-1">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-search"></i>
-                </button>
-            </div>
-            {% else %}
-            <div class="col-md-3">
-                {{ filtro_form.dia_semana }}
-            </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-search"></i>
-                </button>
-            </div>
-            {% endif %}
-        </form>
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5">
+  <div class="flex items-center gap-2 mb-3">
+    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/></svg>
+    <span class="text-sm font-bold text-[#50443C]">Filtros</span>
+  </div>
+  <form method="get" class="flex flex-wrap gap-3 items-end">
+    <div class="flex flex-col gap-1 min-w-[130px]">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ filtro_form.data_inicio.label }}</label>
+      {{ filtro_form.data_inicio }}
     </div>
+    <div class="flex flex-col gap-1 min-w-[130px]">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ filtro_form.data_fim.label }}</label>
+      {{ filtro_form.data_fim }}
+    </div>
+    {% if is_admin %}
+    <div class="flex flex-col gap-1 min-w-[160px]">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ filtro_form.colaborador.label }}</label>
+      {{ filtro_form.colaborador }}
+    </div>
+    {% endif %}
+    <div class="flex flex-col gap-1 min-w-[120px]">
+      <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ filtro_form.dia_semana.label }}</label>
+      {{ filtro_form.dia_semana }}
+    </div>
+    <button type="submit" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors h-[38px]">
+      Filtrar
+    </button>
+    <a href="{% url 'dashboard' %}" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors h-[38px] flex items-center">
+      Limpar
+    </a>
+  </form>
 </div>
 
 <!-- Estatísticas -->
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card text-center" style="border: 1px solid rgba(255, 102, 0, 0.2); background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(10px);">
-            <div class="card-body">
-                <i class="bi bi-calendar-check fs-1" style="color: #ff6600;"></i>
-                <h3 class="mt-2" style="color: #ff6600; font-weight: 700;">{{ total_plantoes }}</h3>
-                <p class="text-muted mb-0" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem;">Plantões Escalados</p>
-            </div>
-        </div>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+  <div class="bg-white rounded-2xl border border-gray-200/80 p-4 flex items-center gap-4">
+    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#E94920] to-[#ff6a45] flex items-center justify-center shrink-0">
+      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
     </div>
-    <div class="col-md-4">
-        <div class="card text-center" style="border: 1px solid rgba(16, 185, 129, 0.2); background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(10px);">
-            <div class="card-body">
-                <i class="bi bi-calendar-week fs-1" style="color: #10b981;"></i>
-                <h3 class="mt-2" style="color: #10b981; font-weight: 700;">{{ plantoes_agrupados|length }}</h3>
-                <p class="text-muted mb-0" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem;">Semanas</p>
-            </div>
-        </div>
+    <div>
+      <p class="text-2xl font-extrabold text-[#50443C] leading-none">{{ total_plantoes }}</p>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">Plantões Escalados</p>
     </div>
-    <div class="col-md-4">
-        <div class="card text-center" style="border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(26, 26, 26, 0.6); backdrop-filter: blur(10px);">
-            <div class="card-body">
-                <i class="bi bi-people fs-1" style="color: #3b82f6;"></i>
-                <h3 class="mt-2" style="color: #3b82f6; font-weight: 700;">{{ colaboradores_count|default:"--" }}</h3>
-                <p class="text-muted mb-0" style="text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem;">Colaboradores Ativos</p>
-            </div>
-        </div>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-200/80 p-4 flex items-center gap-4">
+    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shrink-0">
+      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
     </div>
+    <div>
+      <p class="text-2xl font-extrabold text-[#50443C] leading-none">{{ plantoes_agrupados|length }}</p>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">Semanas</p>
+    </div>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-200/80 p-4 flex items-center gap-4">
+    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0">
+      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    </div>
+    <div>
+      <p class="text-2xl font-extrabold text-[#50443C] leading-none">{{ colaboradores_count|default:"--" }}</p>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">Colaboradores Ativos</p>
+    </div>
+  </div>
 </div>
 
 <!-- Plantões por Semana -->
 {% if plantoes_agrupados %}
-    {% load tz %}
-    {% now "Y-m-d" as today %}
-    {% for semana_key, semana_data in plantoes_agrupados.items %}
-    <div class="card mb-4">
-        <div class="card-header">
-            <i class="bi bi-calendar-range"></i> 
-            Semana de {{ semana_data.inicio|date:"d/m/Y" }} a {{ semana_data.fim|date:"d/m/Y" }}
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-plantoes mb-0">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Dia</th>
-                            <th>Turno</th>
-                            <th>Horário</th>
-                            <th>Colaborador</th>
-                            <th>Observações</th>
-                            <th class="text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody style="background: transparent;">
-                        {% for plantao in semana_data.plantoes %}
-                        <tr>
-                            <td>{{ plantao.data|date:"d/m/Y" }}</td>
-                            <td>
-                                <span class="badge {% if plantao.dia_semana == 'SAB' %}bg-primary{% else %}bg-success{% endif %}">
-                                    {{ plantao.get_dia_semana_display }}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge bg-secondary" style="background: rgba(156, 163, 175, 0.2) !important; padding: 6px 12px; font-size: 0.75rem;">
-                                    {{ plantao.get_turno_display }}
-                                </span>
-                            </td>
-                            <td>
-                                <i class="bi bi-clock" style="color: #ff6600;"></i> 
-                                {{ plantao.hora_inicio|time:"H:i" }} - {{ plantao.hora_fim|time:"H:i" }}
-                            </td>
-                            <td>
-                                <strong>{{ plantao.colaborador.nome_completo }}</strong>
-                            </td>
-                            <td>
-                                {% if plantao.observacoes %}
-                                    <small class="text-muted">{{ plantao.observacoes|truncatewords:10 }}</small>
-                                {% else %}
-                                    <small class="text-muted">--</small>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if is_admin %}
-                                <a href="{% url 'editar_plantao' plantao.id %}" class="btn btn-sm btn-outline-primary" title="Editar">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
-                                <a href="{% url 'deletar_plantao' plantao.id %}" class="btn btn-sm btn-outline-danger" title="Excluir">
-                                    <i class="bi bi-trash"></i>
-                                </a>
-                                {% else %}
-                                {% if plantao.data|date:"Y-m-d" >= today and colaborador_logado and plantao.colaborador.id == colaborador_logado.id %}
-                                <a href="{% url 'solicitar_troca' plantao.id %}"
-                                   class="btn btn-sm"
-                                   title="Solicitar Troca"
-                                   style="background: linear-gradient(135deg, #ff6600, #ff8c00); color: #000; font-weight: 700; border: none;">
-                                    <i class="bi bi-arrow-left-right"></i> Trocar
-                                </a>
-                                {% else %}
-                                <span class="text-muted" style="font-size: 0.8rem;">--</span>
-                                {% endif %}
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  {% for semana_key, semana_data in plantoes_agrupados.items %}
+  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div class="w-7 h-7 rounded-lg bg-[#E94920]/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-[#E94920]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">
+        Semana de {{ semana_data.inicio|date:"d/m/Y" }} a {{ semana_data.fim|date:"d/m/Y" }}
+      </h2>
     </div>
-    {% endfor %}
-{% else %}
-    <div class="card">
-        <div class="card-body text-center py-5">
-            <i class="bi bi-calendar-x fs-1 text-muted"></i>
-            <h4 class="mt-3 text-muted">Nenhum plantão encontrado</h4>
-            <p class="text-muted">
-                {% if is_admin %}
-                Comece cadastrando plantões manualmente ou gerando uma escala automática.
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="bg-gray-50/50">
+            <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Data</th>
+            <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Dia</th>
+            <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Turno</th>
+            <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Horário</th>
+            <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Colaborador</th>
+            <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Obs.</th>
+            <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center px-4 py-2.5 border-b border-gray-100">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for plantao in semana_data.plantoes %}
+          <tr class="hover:bg-gray-50/70 transition-colors">
+            <td class="py-3 px-4 text-sm font-semibold text-[#50443C] border-b border-gray-50">{{ plantao.data|date:"d/m/Y" }}</td>
+            <td class="py-3 px-4 border-b border-gray-50">
+              <span class="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase
+                {% if plantao.dia_semana == 'SAB' %}bg-[#E94920]/10 text-[#E94920]{% else %}bg-emerald-500/10 text-emerald-700{% endif %}">
+                {{ plantao.get_dia_semana_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4 border-b border-gray-50">
+              <span class="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 text-gray-500 uppercase">{{ plantao.get_turno_display }}</span>
+            </td>
+            <td class="py-3 px-4 text-xs text-gray-500 border-b border-gray-50 whitespace-nowrap">{{ plantao.hora_inicio|time:"H:i" }} – {{ plantao.hora_fim|time:"H:i" }}</td>
+            <td class="py-3 px-4 text-sm font-semibold text-[#50443C] border-b border-gray-50">{{ plantao.colaborador.nome_completo }}</td>
+            <td class="py-3 px-4 text-xs text-gray-400 border-b border-gray-50 max-w-[140px] truncate">
+              {{ plantao.observacoes|default:"--"|truncatewords:8 }}
+            </td>
+            <td class="py-3 px-4 text-center border-b border-gray-50">
+              {% if is_admin %}
+              <div class="flex items-center justify-center gap-1">
+                <a href="{% url 'editar_plantao' plantao.id %}" class="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors" title="Editar">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </a>
+                <a href="{% url 'deletar_plantao' plantao.id %}" class="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors" title="Excluir">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </a>
+              </div>
+              {% else %}
+                {% if plantao.data|date:"Y-m-d" >= today and colaborador_logado and plantao.colaborador.id == colaborador_logado.id %}
+                <a href="{% url 'solicitar_troca' plantao.id %}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                  Trocar
+                </a>
                 {% else %}
-                Você ainda não possui plantões escalados.
+                <span class="text-gray-300 text-xs">--</span>
                 {% endif %}
-            </p>
-            {% if is_admin %}
-            <div class="mt-4">
-                <a href="{% url 'cadastrar_plantao' %}" class="btn btn-primary me-2">
-                    <i class="bi bi-plus-circle"></i> Cadastrar Plantão
-                </a>
-                <a href="{% url 'gerar_escala' %}" class="btn btn-success">
-                    <i class="bi bi-magic"></i> Gerar Escala Automática
-                </a>
-            </div>
-            {% endif %}
-        </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-12 text-center">
+  <svg class="w-12 h-12 text-gray-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+  <h4 class="text-sm font-bold text-[#50443C] mb-1">Nenhum plantão encontrado</h4>
+  <p class="text-xs text-gray-400">
+    {% if is_admin %}Comece cadastrando plantões ou gerando uma escala automática.{% else %}Você ainda não possui plantões escalados.{% endif %}
+  </p>
+  {% if is_admin %}
+  <div class="flex items-center justify-center gap-2 mt-5">
+    <a href="{% url 'cadastrar_plantao' %}" class="px-4 py-2 rounded-xl text-xs font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors">Cadastrar Plantão</a>
+    <a href="{% url 'gerar_escala' %}" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">Gerar Escala</a>
+  </div>
+  {% endif %}
+</div>
 {% endif %}
-
 {% endblock %}

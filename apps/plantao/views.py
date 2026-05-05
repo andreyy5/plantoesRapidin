@@ -7,7 +7,7 @@ from .models import Plantao, Colaborador, EscalaAutomatica, TrocaPlantao, Notifi
 from .forms import PlantaoForm, ColaboradorForm, EscalaAutomaticaForm, FiltroPlantaoForm
 from django.http import HttpResponse
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm, inch
@@ -379,162 +379,195 @@ def editar_colaborador(request, colaborador_id):
 
 # ========== EXPORTAR PDF SAC ==========
 
+def _pdf_rodape(canvas, doc):
+    """Rodapé com número de página em todos os documentos PDF."""
+    canvas.saveState()
+    canvas.setStrokeColor(colors.HexColor('#e5e7eb'))
+    canvas.setLineWidth(0.4)
+    y = doc.bottomMargin - 0.5 * cm
+    canvas.line(doc.leftMargin, y, doc.leftMargin + doc.width, y)
+    canvas.setFont('Helvetica', 7)
+    canvas.setFillColor(colors.HexColor('#9ca3af'))
+    canvas.drawString(
+        doc.leftMargin, y - 0.35 * cm,
+        f"Rapidin Plantões — gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}"
+    )
+    canvas.drawRightString(
+        doc.leftMargin + doc.width, y - 0.35 * cm,
+        f"Página {canvas.getPageNumber()}"
+    )
+    canvas.restoreState()
+
+
 @login_required
 def exportar_pdf(request):
-    """Exporta plantões SAC em PDF"""
-    
+    """Exporta plantões SAC em PDF — portrait A4."""
+
+    COR          = colors.HexColor('#E94920')
+    COR_TEXTO    = colors.HexColor('#50443C')
+    COR_ZEBRA    = colors.HexColor('#fdf5f3')
+    COR_BORDA    = colors.HexColor('#e5e7eb')
+    COR_SEM_BG   = colors.HexColor('#fff8f6')
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer,
-        pagesize=landscape(A4),
-        rightMargin=1*cm,
-        leftMargin=1*cm,
-        topMargin=1.5*cm,
-        bottomMargin=1.5*cm
+        pagesize=A4,
+        rightMargin=1.5 * cm,
+        leftMargin=1.5 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2.2 * cm,
     )
-    
-    elements = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        textColor=colors.HexColor('#ff6600'),
-        alignment=TA_CENTER,
-        spaceAfter=20
-    )
-    
-    subtitle_style = ParagraphStyle(
-        'CustomSubtitle',
-        parent=styles['Normal'],
-        fontSize=11,
-        textColor=colors.grey,
-        alignment=TA_CENTER,
-        spaceAfter=30
-    )
-    
-    hoje = datetime.now().date()
+
+    # Largura útil da página
+    W = doc.width
+
+    # ── Dados ──────────────────────────────────────────────────────────────
+    hoje     = datetime.now().date()
     data_fim = hoje + timedelta(weeks=4)
-    plantoes = Plantao.objects.select_related('colaborador').filter(
-        data__gte=hoje,
-        data__lte=data_fim
-    ).order_by('data', 'hora_inicio')
-    
+
+    plantoes = (
+        Plantao.objects
+        .select_related('colaborador')
+        .filter(data__gte=hoje, data__lte=data_fim)
+        .order_by('data', 'hora_inicio')
+    )
+
     user_type = get_user_type(request.user)
-    
     if user_type == 'colaborador':
         colaborador = get_user_colaborador(request.user)
         if colaborador:
             plantoes = plantoes.filter(colaborador=colaborador)
-            titulo = f"Meus Plantões - {colaborador.nome_completo}"
+            titulo = f"Meus Plantões — {colaborador.nome_completo}"
         else:
             plantoes = Plantao.objects.none()
-            titulo = "Meus Plantões"
+            titulo   = "Meus Plantões"
     else:
-        titulo = "Escala de Plantões - Todos os Colaboradores"
-    
-    elements.append(Paragraph(titulo, title_style))
+        titulo = "Escala de Plantões — SAC"
+
+    # ── Estilos ─────────────────────────────────────────────────────────────
+    def st(name, **kw):
+        defaults = dict(fontName='Helvetica', fontSize=9, textColor=COR_TEXTO, leading=12)
+        defaults.update(kw)
+        return ParagraphStyle(name, **defaults)
+
+    st_th  = st('th', fontName='Helvetica-Bold', fontSize=8,
+                textColor=colors.white, alignment=TA_CENTER, leading=11)
+    st_td  = st('td', fontSize=8, leading=11)
+    st_tdc = st('tdc', fontSize=8, leading=11, alignment=TA_CENTER)
+
+    elements = []
+
+    # ── Cabeçalho do documento ──────────────────────────────────────────────
+    hdr = Table(
+        [[Paragraph(f'<b>{titulo}</b>',
+                    ParagraphStyle('ht', fontName='Helvetica-Bold', fontSize=13,
+                                   textColor=colors.white, alignment=TA_CENTER, leading=16))]],
+        colWidths=[W],
+    )
+    hdr.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, -1), COR),
+        ('TOPPADDING',    (0, 0), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 11),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 14),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 14),
+    ]))
+    elements.append(hdr)
+    elements.append(Spacer(1, 0.25 * cm))
     elements.append(Paragraph(
         f"Período: {hoje.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}",
-        subtitle_style
+        ParagraphStyle('sub', fontName='Helvetica', fontSize=8,
+                       textColor=colors.HexColor('#9ca3af'),
+                       alignment=TA_CENTER, spaceAfter=14),
     ))
-    
+
+    # ── Sem dados ───────────────────────────────────────────────────────────
     if not plantoes.exists():
+        elements.append(Spacer(1, 1.5 * cm))
         elements.append(Paragraph(
             "Nenhum plantão encontrado para este período.",
-            styles['Normal']
+            ParagraphStyle('vz', fontName='Helvetica', fontSize=10,
+                           textColor=colors.grey, alignment=TA_CENTER),
         ))
     else:
-        plantoes_por_semana = {}
-        for plantao in plantoes:
-            inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
-            semana_key = inicio_semana.strftime('%Y-%m-%d')
-            
-            if semana_key not in plantoes_por_semana:
-                plantoes_por_semana[semana_key] = {
-                    'inicio': inicio_semana,
-                    'fim': inicio_semana + timedelta(days=6),
-                    'plantoes': []
-                }
-            plantoes_por_semana[semana_key]['plantoes'].append(plantao)
-        
-        for semana_key, semana_data in sorted(plantoes_por_semana.items()):
-            semana_style = ParagraphStyle(
-                'SemanaHeader',
-                parent=styles['Heading2'],
-                fontSize=13,
-                textColor=colors.HexColor('#ff6600'),
-                spaceAfter=10,
-                spaceBefore=15
+        # Agrupar por semana
+        semanas = {}
+        for p in plantoes:
+            ini = p.data - timedelta(days=p.data.weekday())
+            k   = ini.strftime('%Y-%m-%d')
+            if k not in semanas:
+                semanas[k] = {'inicio': ini, 'fim': ini + timedelta(days=6), 'plantoes': []}
+            semanas[k]['plantoes'].append(p)
+
+        # Colunas — portrait A4 (~18 cm útil)
+        COL = [2.3*cm, 1.8*cm, 3.4*cm, 2.8*cm, 4.4*cm, 3.3*cm]
+
+        for k in sorted(semanas):
+            sd = semanas[k]
+            label = f"Semana de {sd['inicio'].strftime('%d/%m/%Y')} a {sd['fim'].strftime('%d/%m/%Y')}"
+
+            # Faixa de semana
+            sem_t = Table(
+                [[Paragraph(f'<b>{label}</b>',
+                            ParagraphStyle('sl', fontName='Helvetica-Bold', fontSize=9,
+                                           textColor=COR, leading=12))]],
+                colWidths=[W],
             )
-            
-            elements.append(Paragraph(
-                f"Semana de {semana_data['inicio'].strftime('%d/%m/%Y')} a {semana_data['fim'].strftime('%d/%m/%Y')}",
-                semana_style
-            ))
-            
-            data = [
-                ['Data', 'Dia', 'Turno', 'Horário', 'Colaborador', 'Observações']
-            ]
-            
-            for plantao in semana_data['plantoes']:
-                data.append([
-                    plantao.data.strftime('%d/%m/%Y'),
-                    plantao.get_dia_semana_display(),
-                    plantao.get_turno_display(),
-                    f"{plantao.hora_inicio.strftime('%H:%M')} - {plantao.hora_fim.strftime('%H:%M')}",
-                    plantao.colaborador.nome_completo,
-                    plantao.observacoes[:30] + '...' if plantao.observacoes and len(plantao.observacoes) > 30 else plantao.observacoes or '--'
-                ])
-            
-            table = Table(data, colWidths=[3*cm, 2.5*cm, 4*cm, 3.5*cm, 5*cm, 5*cm])
-            
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ff6600')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
-                ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#ff6600')),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fff4e6')]),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                ('LEFTPADDING', (0, 0), (-1, -1), 8),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            sem_t.setStyle(TableStyle([
+                ('BACKGROUND',    (0, 0), (-1, -1), COR_SEM_BG),
+                ('TOPPADDING',    (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 10),
+                ('LINEBELOW',     (0, 0), (-1, -1), 1.2, COR),
             ]))
-            
-            elements.append(table)
-            elements.append(Spacer(1, 0.5*cm))
-    
-    footer_style = ParagraphStyle(
-        'Footer',
-        parent=styles['Normal'],
-        fontSize=8,
-        textColor=colors.grey,
-        alignment=TA_CENTER
-    )
-    elements.append(Spacer(1, 1*cm))
-    elements.append(Paragraph(
-        f"Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')} - Sistema de Plantões Rapidin",
-        footer_style
-    ))
-    
-    doc.build(elements)
+            elements.append(sem_t)
+
+            # Tabela de plantões
+            rows = [[
+                Paragraph('Data',        st_th),
+                Paragraph('Dia',         st_th),
+                Paragraph('Turno',       st_th),
+                Paragraph('Horário',     st_th),
+                Paragraph('Colaborador', st_th),
+                Paragraph('Observações', st_th),
+            ]]
+            for p in sd['plantoes']:
+                obs = (p.observacoes[:38] + '…') if p.observacoes and len(p.observacoes) > 38 else (p.observacoes or '—')
+                rows.append([
+                    Paragraph(p.data.strftime('%d/%m/%Y'),                              st_tdc),
+                    Paragraph(p.get_dia_semana_display(),                               st_tdc),
+                    Paragraph(p.get_turno_display(),                                    st_td),
+                    Paragraph(f"{p.hora_inicio.strftime('%H:%M')} – {p.hora_fim.strftime('%H:%M')}", st_tdc),
+                    Paragraph(p.colaborador.nome_completo,                              st_td),
+                    Paragraph(obs,                                                      st_td),
+                ])
+
+            row_bgs = [('BACKGROUND', (0, i), (-1, i),
+                        colors.white if i % 2 == 1 else COR_ZEBRA)
+                       for i in range(1, len(rows))]
+
+            t = Table(rows, colWidths=COL, repeatRows=1)
+            t.setStyle(TableStyle([
+                ('BACKGROUND',    (0, 0), (-1, 0), COR),
+                ('TOPPADDING',    (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING',  (0, 0), (-1, -1), 8),
+                ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+                ('LINEBELOW',     (0, 0), (-1, -1), 0.3, COR_BORDA),
+                ('LINEAFTER',     (0, 0), (-1, -1), 0.3, COR_BORDA),
+                *row_bgs,
+            ]))
+            elements.append(t)
+            elements.append(Spacer(1, 0.7 * cm))
+
+    doc.build(elements, onFirstPage=_pdf_rodape, onLaterPages=_pdf_rodape)
     buffer.seek(0)
-    
+
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    filename = f"plantoes_sac_{hoje.strftime('%Y%m%d')}.pdf"
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
+    response['Content-Disposition'] = (
+        f'attachment; filename="plantoes_sac_{hoje.strftime("%Y%m%d")}.pdf"'
+    )
     return response
 
 
@@ -879,190 +912,193 @@ def dashboard_tecnicos(request):
 
 @login_required
 def exportar_pdf_tecnicos(request):
-    """Exporta plantões técnicos em PDF"""
-    
+    """Exporta plantões técnicos em PDF — portrait A4."""
+
     from .models import PlantaoTecnico, TecnicoCampo
-    
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="plantoes_tecnicos_{datetime.now().strftime("%Y%m%d")}.pdf"'
-    
-    doc = SimpleDocTemplate(response, pagesize=landscape(A4),
-                           topMargin=0.5*inch, bottomMargin=0.5*inch,
-                           leftMargin=0.5*inch, rightMargin=0.5*inch)
-    
-    elements = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        textColor=colors.HexColor('#ff6600'),
-        spaceAfter=30,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
+
+    COR        = colors.HexColor('#E94920')
+    COR_TEXTO  = colors.HexColor('#50443C')
+    COR_ZEBRA  = colors.HexColor('#fdf5f3')
+    COR_BORDA  = colors.HexColor('#e5e7eb')
+    COR_SEM_BG = colors.HexColor('#fff8f6')
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=1.5 * cm,
+        leftMargin=1.5 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2.2 * cm,
     )
-    
-    subtitle_style = ParagraphStyle(
-        'CustomSubtitle',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.grey,
-        spaceAfter=20,
-        alignment=TA_CENTER
+    W = doc.width
+
+    # ── Dados ──────────────────────────────────────────────────────────────
+    hoje     = datetime.now().date()
+    data_fim = hoje + timedelta(weeks=4)
+
+    plantoes = (
+        PlantaoTecnico.objects
+        .select_related('tecnico_principal', 'tecnico_dupla')
+        .all()
     )
-    
-    elements.append(Paragraph("ESCALA DE PLANTÕES - TÉCNICOS DE CAMPO", title_style))
-    elements.append(Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", subtitle_style))
-    
-    # Buscar plantões
-    plantoes = PlantaoTecnico.objects.select_related('tecnico_principal', 'tecnico_dupla').all()
-    
-    # Verificar tipo de usuário
+
     user_type = get_user_type(request.user)
-    
-    # 🔴 CORREÇÃO: Se for técnico (não admin), filtrar apenas seus plantões
     if user_type == 'tecnico':
         try:
-            tecnico = TecnicoCampo.objects.get(user=request.user)
+            tecnico  = TecnicoCampo.objects.get(user=request.user)
             plantoes = plantoes.filter(
                 Q(tecnico_principal=tecnico) | Q(tecnico_dupla=tecnico)
             )
+            titulo = f"Meus Plantões — {tecnico.nome_completo}"
         except TecnicoCampo.DoesNotExist:
             plantoes = PlantaoTecnico.objects.none()
-    
-    # Filtrar próximas 4 semanas
-    hoje = datetime.now().date()
-    data_fim = hoje + timedelta(weeks=4)
-    plantoes = plantoes.filter(data__gte=hoje, data__lte=data_fim).order_by('data', 'hora_inicio')
-    
-    # Agrupar por semana
-    plantoes_agrupados = {}
-    for plantao in plantoes:
-        inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
-        semana_key = inicio_semana.strftime('%Y-%m-%d')
-        
-        if semana_key not in plantoes_agrupados:
-            plantoes_agrupados[semana_key] = {
-                'inicio': inicio_semana,
-                'fim': inicio_semana + timedelta(days=6),
-                'plantoes': []
-            }
-        plantoes_agrupados[semana_key]['plantoes'].append(plantao)
-    
-    # Gerar tabelas por semana
-    for semana_key in sorted(plantoes_agrupados.keys()):
-        semana = plantoes_agrupados[semana_key]
-        
-        semana_style = ParagraphStyle(
-            'SemanaStyle',
-            parent=styles['Heading2'],
-            fontSize=12,
-            textColor=colors.HexColor('#ff6600'),
-            spaceAfter=10,
-            spaceBefore=15,
-            alignment=TA_LEFT,
-            fontName='Helvetica-Bold'
-        )
-        
-        semana_text = f"Semana de {semana['inicio'].strftime('%d/%m/%Y')} a {semana['fim'].strftime('%d/%m/%Y')}"
-        elements.append(Paragraph(semana_text, semana_style))
-        
-        # Cabeçalho da tabela
-        data = [['Data', 'Dia', 'Tipo', 'Horário', 'Técnico(s)', 'Obs']]
-        
-        # Linhas da tabela
-        for plantao in semana['plantoes']:
-            # Mapear tipos
-            tipo_map = {
-                'SABADO_DUPLA': 'Dupla',
-                'DOMINGO_SOLO': 'Solo',
-                'AVULSO_SOLO': 'Avulso'
-            }
-            tipo = tipo_map.get(plantao.tipo, 'Desconhecido')
-            
-            # Técnicos (nome + dupla se houver)
-            if plantao.tecnico_dupla:
-                tecnicos = f"{plantao.tecnico_principal.nome_completo}\n+ {plantao.tecnico_dupla.nome_completo}"
-            else:
-                tecnicos = plantao.tecnico_principal.nome_completo
-            
-            # Dia da semana
-            dias = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
-            dia = dias[plantao.data.weekday()]
-            
-            # Observações truncadas
-            obs = plantao.observacoes[:30] + '...' if plantao.observacoes and len(plantao.observacoes) > 30 else (plantao.observacoes or '--')
-            
-            data.append([
-                plantao.data.strftime('%d/%m'),
-                dia,
-                tipo,
-                f"{plantao.hora_inicio.strftime('%H:%M')}-{plantao.hora_fim.strftime('%H:%M')}",
-                tecnicos,
-                obs
-            ])
-        
-        # Criar tabela
-        table = Table(data, colWidths=[0.8*inch, 0.7*inch, 1*inch, 1.2*inch, 2.5*inch, 1.8*inch])
-        
-        # Estilizar tabela
-        table.setStyle(TableStyle([
-            # Cabeçalho
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ff6600')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            
-            # Corpo
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('TOPPADDING', (0, 1), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
-            
-            # Grade e bordas
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            
-            # Linhas alternadas
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
-        ]))
-        
-        elements.append(table)
-        elements.append(Spacer(1, 0.2*inch))
-    
-    # Se não houver plantões
-    if not plantoes_agrupados:
-        no_data_style = ParagraphStyle(
-            'NoDataStyle',
-            parent=styles['Normal'],
-            fontSize=12,
-            textColor=colors.grey,
-            alignment=TA_CENTER
-        )
-        elements.append(Spacer(1, 1*inch))
-        elements.append(Paragraph("Nenhum plantão encontrado para o período selecionado.", no_data_style))
-    
-    # Rodapé
-    footer_style = ParagraphStyle(
-        'FooterStyle',
-        parent=styles['Normal'],
-        fontSize=8,
-        textColor=colors.grey,
-        alignment=TA_CENTER,
-        spaceBefore=30
+            titulo   = "Meus Plantões"
+    else:
+        titulo = "Escala de Plantões — Técnicos de Campo"
+
+    plantoes = plantoes.filter(
+        data__gte=hoje, data__lte=data_fim
+    ).order_by('data', 'hora_inicio')
+
+    # ── Estilos ─────────────────────────────────────────────────────────────
+    def st(name, **kw):
+        defaults = dict(fontName='Helvetica', fontSize=9, textColor=COR_TEXTO, leading=12)
+        defaults.update(kw)
+        return ParagraphStyle(name, **defaults)
+
+    st_th  = st('th', fontName='Helvetica-Bold', fontSize=8,
+                textColor=colors.white, alignment=TA_CENTER, leading=11)
+    st_td  = st('td', fontSize=8, leading=11)
+    st_tdc = st('tdc', fontSize=8, leading=11, alignment=TA_CENTER)
+
+    elements = []
+
+    # ── Cabeçalho do documento ──────────────────────────────────────────────
+    hdr = Table(
+        [[Paragraph(f'<b>{titulo}</b>',
+                    ParagraphStyle('ht', fontName='Helvetica-Bold', fontSize=13,
+                                   textColor=colors.white, alignment=TA_CENTER, leading=16))]],
+        colWidths=[W],
     )
-    elements.append(Spacer(1, 0.5*inch))
-    elements.append(Paragraph("Sistema de Plantões Rapidin - Técnicos de Campo", footer_style))
-    
-    # Gerar PDF
-    doc.build(elements)
-    
+    hdr.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, -1), COR),
+        ('TOPPADDING',    (0, 0), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 11),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 14),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 14),
+    ]))
+    elements.append(hdr)
+    elements.append(Spacer(1, 0.25 * cm))
+    elements.append(Paragraph(
+        f"Período: {hoje.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}",
+        ParagraphStyle('sub', fontName='Helvetica', fontSize=8,
+                       textColor=colors.HexColor('#9ca3af'),
+                       alignment=TA_CENTER, spaceAfter=14),
+    ))
+
+    # ── Agrupar por semana ──────────────────────────────────────────────────
+    semanas = {}
+    for p in plantoes:
+        ini = p.data - timedelta(days=p.data.weekday())
+        k   = ini.strftime('%Y-%m-%d')
+        if k not in semanas:
+            semanas[k] = {'inicio': ini, 'fim': ini + timedelta(days=6), 'plantoes': []}
+        semanas[k]['plantoes'].append(p)
+
+    if not semanas:
+        elements.append(Spacer(1, 1.5 * cm))
+        elements.append(Paragraph(
+            "Nenhum plantão encontrado para este período.",
+            ParagraphStyle('vz', fontName='Helvetica', fontSize=10,
+                           textColor=colors.grey, alignment=TA_CENTER),
+        ))
+    else:
+        TIPO_MAP = {'SABADO_DUPLA': 'Dupla', 'DOMINGO_SOLO': 'Solo', 'AVULSO_SOLO': 'Avulso'}
+        DIAS     = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+
+        # Colunas — portrait A4 (~18 cm útil)
+        COL = [2.1*cm, 1.6*cm, 2.5*cm, 2.8*cm, 5.3*cm, 3.7*cm]
+
+        for k in sorted(semanas):
+            sd    = semanas[k]
+            label = f"Semana de {sd['inicio'].strftime('%d/%m/%Y')} a {sd['fim'].strftime('%d/%m/%Y')}"
+
+            # Faixa de semana
+            sem_t = Table(
+                [[Paragraph(f'<b>{label}</b>',
+                            ParagraphStyle('sl', fontName='Helvetica-Bold', fontSize=9,
+                                           textColor=COR, leading=12))]],
+                colWidths=[W],
+            )
+            sem_t.setStyle(TableStyle([
+                ('BACKGROUND',    (0, 0), (-1, -1), COR_SEM_BG),
+                ('TOPPADDING',    (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 10),
+                ('LINEBELOW',     (0, 0), (-1, -1), 1.2, COR),
+            ]))
+            elements.append(sem_t)
+
+            # Tabela de plantões
+            rows = [[
+                Paragraph('Data',       st_th),
+                Paragraph('Dia',        st_th),
+                Paragraph('Tipo',       st_th),
+                Paragraph('Horário',    st_th),
+                Paragraph('Técnico(s)', st_th),
+                Paragraph('Obs.',       st_th),
+            ]]
+
+            for p in sd['plantoes']:
+                tipo = TIPO_MAP.get(p.tipo, p.tipo)
+                dia  = DIAS[p.data.weekday()]
+                obs  = (p.observacoes[:38] + '…') if p.observacoes and len(p.observacoes) > 38 else (p.observacoes or '—')
+
+                if p.tecnico_dupla:
+                    tecs = Paragraph(
+                        f"{p.tecnico_principal.nome_completo}<br/>"
+                        f"<font size='7' color='#9ca3af'>+ {p.tecnico_dupla.nome_completo}</font>",
+                        st_td,
+                    )
+                else:
+                    tecs = Paragraph(p.tecnico_principal.nome_completo, st_td)
+
+                rows.append([
+                    Paragraph(p.data.strftime('%d/%m/%Y'),                              st_tdc),
+                    Paragraph(dia,                                                       st_tdc),
+                    Paragraph(tipo,                                                      st_tdc),
+                    Paragraph(f"{p.hora_inicio.strftime('%H:%M')} – {p.hora_fim.strftime('%H:%M')}", st_tdc),
+                    tecs,
+                    Paragraph(obs, st_td),
+                ])
+
+            row_bgs = [('BACKGROUND', (0, i), (-1, i),
+                        colors.white if i % 2 == 1 else COR_ZEBRA)
+                       for i in range(1, len(rows))]
+
+            t = Table(rows, colWidths=COL, repeatRows=1)
+            t.setStyle(TableStyle([
+                ('BACKGROUND',    (0, 0), (-1, 0), COR),
+                ('TOPPADDING',    (0, 0), (-1, -1), 7),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+                ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING',  (0, 0), (-1, -1), 8),
+                ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+                ('LINEBELOW',     (0, 0), (-1, -1), 0.3, COR_BORDA),
+                ('LINEAFTER',     (0, 0), (-1, -1), 0.3, COR_BORDA),
+                *row_bgs,
+            ]))
+            elements.append(t)
+            elements.append(Spacer(1, 0.7 * cm))
+
+    doc.build(elements, onFirstPage=_pdf_rodape, onLaterPages=_pdf_rodape)
+    buffer.seek(0)
+
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = (
+        f'attachment; filename="plantoes_tecnicos_{hoje.strftime("%Y%m%d")}.pdf"'
+    )
     return response
 
 

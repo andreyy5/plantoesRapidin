@@ -1,122 +1,192 @@
 {% extends 'base.html' %}
-
-{% block title %}{{ titulo }} - Sistema de Plantões{% endblock %}
+{% block title %}{{ titulo }} - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card" style="border: 2px solid rgba(255, 102, 0, 0.4);">
-            <div class="card-header" style="background: linear-gradient(135deg, rgba(255, 102, 0, 0.15) 0%, rgba(255, 140, 0, 0.08) 100%);">
-                <h4 class="mb-0" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">
-                    <i class="bi bi-calendar-plus"></i> {{ titulo }}
-                </h4>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    
-                    <div class="mb-4">
-                        <label for="{{ form.colaborador.id_for_label }}" class="form-label">
-                            {{ form.colaborador.label }}
-                            <span style="color: #ef4444;">*</span>
-                        </label>
-                        {{ form.colaborador }}
-                        {% if form.colaborador.errors %}
-                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
-                                {{ form.colaborador.errors }}
-                            </div>
-                        {% endif %}
-                        <small class="text-muted d-block mt-1">Selecione o colaborador que fará o plantão</small>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label for="{{ form.data.id_for_label }}" class="form-label">
-                            {{ form.data.label }}
-                            <span style="color: #ef4444;">*</span>
-                        </label>
-                        {{ form.data }}
-                        {% if form.data.errors %}
-                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
-                                {{ form.data.errors }}
-                            </div>
-                        {% endif %}
-                        <small class="text-muted d-block mt-1">Data do plantão (Sábado ou Domingo)</small>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label for="{{ form.turno.id_for_label }}" class="form-label">
-                            {{ form.turno.label }}
-                            <span style="color: #ef4444;">*</span>
-                        </label>
-                        {{ form.turno }}
-                        {% if form.turno.errors %}
-                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
-                                {{ form.turno.errors }}
-                            </div>
-                        {% endif %}
-                        <small class="text-muted d-block mt-1">Selecione o turno do plantão</small>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label for="{{ form.observacoes.id_for_label }}" class="form-label">
-                            {{ form.observacoes.label }}
-                        </label>
-                        {{ form.observacoes }}
-                        {% if form.observacoes.errors %}
-                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
-                                {{ form.observacoes.errors }}
-                            </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> 
-                        <strong>Importante:</strong> Os horários são definidos automaticamente baseado no turno selecionado.
-                    </div>
-                    
-                    <div class="d-flex justify-content-between mt-4">
-                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Voltar
-                        </a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Salvar Plantão
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Card informativo sobre turnos -->
-        <div class="card mt-4" style="border: 2px solid rgba(59, 130, 246, 0.3);">
-            <div class="card-header" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);">
-                <h5 class="mb-0" style="color: #3b82f6; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                    <i class="bi bi-clock-history"></i> Horários dos Turnos
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6 style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                            <i class="bi bi-calendar"></i> Sábado
-                        </h6>
-                        <ul class="list-unstyled">
-                            <li class="mb-2"><i class="bi bi-clock" style="color: #ff6600;"></i> <strong>Tarde 1:</strong> 13:00 - 17:00</li>
-                            <li><i class="bi bi-clock" style="color: #ff6600;"></i> <strong>Tarde 2:</strong> 17:00 - 21:00</li>
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6 style="color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                            <i class="bi bi-calendar"></i> Domingo
-                        </h6>
-                        <ul class="list-unstyled">
-                            <li class="mb-2"><i class="bi bi-clock" style="color: #10b981;"></i> <strong>Manhã:</strong> 08:00 - 13:00</li>
-                            <li class="mb-2"><i class="bi bi-clock" style="color: #10b981;"></i> <strong>Tarde 1:</strong> 13:00 - 17:00</li>
-                            <li><i class="bi bi-clock" style="color: #10b981;"></i> <strong>Tarde 2:</strong> 17:00 - 21:00</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="max-w-2xl mx-auto flex flex-col gap-4">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-bold text-[#50443C]">{{ titulo }}</h1>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">Preencha os dados do plantão</p>
     </div>
+    <a href="{% url 'dashboard' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+      Voltar
+    </a>
+  </div>
+
+  <!-- Formulário -->
+  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div class="w-7 h-7 rounded-lg bg-[#E94920]/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-[#E94920]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">Dados do Plantão</h2>
+    </div>
+    <div class="p-5">
+      <form method="post" class="flex flex-col gap-4">
+        {% csrf_token %}
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-[#50443C]">
+            {{ form.colaborador.label }} <span class="text-red-400">*</span>
+          </label>
+          {{ form.colaborador }}
+          {% if form.colaborador.errors %}
+          <p class="text-xs text-red-500">{{ form.colaborador.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-[#50443C]">
+            {{ form.data.label }} <span class="text-red-400">*</span>
+          </label>
+          {{ form.data }}
+          {% if form.data.errors %}
+          <p class="text-xs text-red-500">{{ form.data.errors|join:", " }}</p>
+          {% endif %}
+          <p id="dia-info" class="text-[10px] text-gray-400 hidden"></p>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-[#50443C]">
+            {{ form.turno.label }} <span class="text-red-400">*</span>
+          </label>
+          {{ form.turno }}
+          {% if form.turno.errors %}
+          <p class="text-xs text-red-500">{{ form.turno.errors|join:", " }}</p>
+          {% endif %}
+          <p id="turno-hint" class="text-[10px] text-amber-600 hidden">Selecione uma data primeiro para ver os turnos disponíveis.</p>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-[#50443C]">{{ form.observacoes.label }}</label>
+          {{ form.observacoes }}
+          {% if form.observacoes.errors %}
+          <p class="text-xs text-red-500">{{ form.observacoes.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+
+        <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Os horários são definidos automaticamente com base no turno selecionado.
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <a href="{% url 'dashboard' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+            Cancelar
+          </a>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+            Salvar Plantão
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Referência de horários -->
+  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div class="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">Horários dos Turnos</h2>
+    </div>
+    <div class="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <p class="text-xs font-bold text-[#E94920] uppercase tracking-wider mb-2">Sábado</p>
+        <ul class="space-y-1.5">
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 1:</span> 13:00 – 17:00</li>
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 2:</span> 17:00 – 21:00</li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Domingo</p>
+        <ul class="space-y-1.5">
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Manhã:</span> 08:00 – 13:00</li>
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 1:</span> 13:00 – 17:00</li>
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 2:</span> 17:00 – 21:00</li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Avulso (Seg–Sex)</p>
+        <ul class="space-y-1.5">
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Manhã:</span> 08:00 – 13:00</li>
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 1:</span> 13:00 – 17:00</li>
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 2:</span> 17:00 – 21:00</li>
+          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Dia todo:</span> 08:00 – 18:00</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var SAB_TURNOS   = ['SABADO_TARDE1', 'SABADO_TARDE2'];
+  var DOM_TURNOS   = ['DOMINGO_MANHA', 'DOMINGO_TARDE1', 'DOMINGO_TARDE2'];
+  var AVULSO_TURNOS = ['AVULSO_MANHA', 'AVULSO_TARDE1', 'AVULSO_TARDE2', 'AVULSO_DIA_TODO'];
+  var DIAS = ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'];
+
+  var dataInput  = document.getElementById('{{ form.data.id_for_label }}');
+  var turnoSel   = document.getElementById('{{ form.turno.id_for_label }}');
+  var diaInfo    = document.getElementById('dia-info');
+  var turnoHint  = document.getElementById('turno-hint');
+
+  function filtrarTurnos() {
+    if (!dataInput.value) {
+      // Sem data: mostra tudo
+      for (var i = 0; i < turnoSel.options.length; i++) {
+        turnoSel.options[i].hidden = false;
+      }
+      diaInfo.classList.add('hidden');
+      return;
+    }
+
+    var partes = dataInput.value.split('-');
+    var d = new Date(partes[0], partes[1] - 1, partes[2]);
+    var dow = d.getDay(); // 0=Dom … 6=Sáb
+    // JS: 0=Dom,1=Seg,…,6=Sáb  →  Python: 0=Seg,…,5=Sáb,6=Dom
+    var pythonDow = (dow === 0) ? 6 : dow - 1;
+
+    diaInfo.textContent = DIAS[pythonDow];
+    diaInfo.classList.remove('hidden');
+    turnoHint.classList.add('hidden');
+
+    var permitidos;
+    if (pythonDow === 5) {        // Sábado
+      permitidos = SAB_TURNOS;
+    } else if (pythonDow === 6) { // Domingo
+      permitidos = DOM_TURNOS;
+    } else {                      // Seg–Sex
+      permitidos = AVULSO_TURNOS;
+    }
+
+    var primeiroVisivel = null;
+    for (var i = 0; i < turnoSel.options.length; i++) {
+      var opt = turnoSel.options[i];
+      if (opt.value === '') { opt.hidden = false; continue; }
+      var visivel = permitidos.indexOf(opt.value) !== -1;
+      opt.hidden = !visivel;
+      if (visivel && !primeiroVisivel) primeiroVisivel = opt.value;
+    }
+
+    // Se o turno atual não está na lista permitida, resetar
+    if (turnoSel.value && permitidos.indexOf(turnoSel.value) === -1) {
+      turnoSel.value = '';
+    }
+  }
+
+  if (dataInput) {
+    dataInput.addEventListener('change', filtrarTurnos);
+    // Rodar na carga da página (modo edição)
+    if (dataInput.value) filtrarTurnos();
+    else turnoHint.classList.remove('hidden');
+  }
+})();
+</script>
 {% endblock %}

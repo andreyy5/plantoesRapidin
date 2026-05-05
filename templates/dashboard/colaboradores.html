@@ -1,108 +1,103 @@
 {% extends 'base.html' %}
-
-{% block title %}Colaboradores - Sistema de Plantões{% endblock %}
+{% block title %}Colaboradores - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 class="mb-1"><i class="bi bi-people text-primary"></i> Gerenciar Colaboradores</h2>
-        <p class="text-muted">Gerencie a fila de plantões e colaboradores ativos</p>
-    </div>
-    <div>
-        <a href="{% url 'cadastrar_colaborador' %}" class="btn btn-primary">
-            <i class="bi bi-person-plus"></i> Novo Colaborador
-        </a>
-    </div>
+
+<!-- Cabeçalho -->
+<div class="flex items-center justify-between flex-wrap gap-3">
+  <div>
+    <h1 class="text-lg font-bold text-[#50443C]">Gerenciar Colaboradores</h1>
+    <p class="text-xs text-gray-400 font-medium mt-0.5">Gerencie a fila de plantões e colaboradores ativos</p>
+  </div>
+  <a href="{% url 'cadastrar_colaborador' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Novo Colaborador
+  </a>
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <i class="bi bi-list-ol"></i> Ordem da Fila de Plantões
+<!-- Tabela -->
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+  <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+    <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center">
+      <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     </div>
-    <div class="card-body p-0">
-        {% if colaboradores %}
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th width="10%">Ordem</th>
-                            <th width="35%">Nome</th>
-                            <th width="15%" class="text-center">Status</th>
-                            <th width="20%" class="text-center">Usuário Vinculado</th>
-                            <th width="20%" class="text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for colaborador in colaboradores %}
-                        <tr>
-                            <td>
-                                <span class="badge bg-primary rounded-circle fs-6 px-3 py-2">
-                                    {{ colaborador.ordem_fila }}
-                                </span>
-                            </td>
-                            <td>
-                                <strong>{{ colaborador.nome_completo }}</strong>
-                            </td>
-                            <td class="text-center">
-                                {% if colaborador.ativo %}
-                                    <span class="badge bg-success">
-                                        <i class="bi bi-check-circle"></i> Ativo
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-secondary">
-                                        <i class="bi bi-x-circle"></i> Inativo
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if colaborador.user %}
-                                    <i class="bi bi-person-check text-success"></i> 
-                                    {{ colaborador.user.username }}
-                                {% else %}
-                                    <i class="bi bi-person-x text-muted"></i>
-                                    <small class="text-muted">Sem vínculo</small>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                <a href="{% url 'editar_colaborador' colaborador.id %}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i> Editar
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-people fs-1 text-muted"></i>
-                <h4 class="mt-3 text-muted">Nenhum colaborador cadastrado</h4>
-                <p class="text-muted">Comece cadastrando os colaboradores que farão plantões.</p>
-                <a href="{% url 'cadastrar_colaborador' %}" class="btn btn-primary mt-3">
-                    <i class="bi bi-person-plus"></i> Cadastrar Primeiro Colaborador
-                </a>
-            </div>
-        {% endif %}
-    </div>
+    <h2 class="text-sm font-bold text-[#50443C]">Ordem da Fila de Plantões</h2>
+  </div>
+  {% if colaboradores %}
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead>
+        <tr class="bg-gray-50/50">
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Ordem</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Nome</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center px-4 py-2.5 border-b border-gray-100">Status</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center px-4 py-2.5 border-b border-gray-100">Usuário</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center px-4 py-2.5 border-b border-gray-100">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for colaborador in colaboradores %}
+        <tr class="hover:bg-gray-50/70 transition-colors">
+          <td class="py-3 px-4 border-b border-gray-50">
+            <span class="inline-flex w-7 h-7 rounded-lg bg-[#E94920]/10 text-[#E94920] text-xs font-bold items-center justify-center">{{ colaborador.ordem_fila }}</span>
+          </td>
+          <td class="py-3 px-4 text-sm font-semibold text-[#50443C] border-b border-gray-50">{{ colaborador.nome_completo }}</td>
+          <td class="py-3 px-4 text-center border-b border-gray-50">
+            {% if colaborador.ativo %}
+            <span class="inline-flex px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-500/10 text-emerald-700">Ativo</span>
+            {% else %}
+            <span class="inline-flex px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-400">Inativo</span>
+            {% endif %}
+          </td>
+          <td class="py-3 px-4 text-center border-b border-gray-50">
+            {% if colaborador.user %}
+            <span class="text-xs font-medium text-[#50443C]">{{ colaborador.user.username }}</span>
+            {% else %}
+            <span class="text-xs text-gray-300">Sem vínculo</span>
+            {% endif %}
+          </td>
+          <td class="py-3 px-4 text-center border-b border-gray-50">
+            <a href="{% url 'editar_colaborador' colaborador.id %}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              Editar
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="py-14 text-center">
+    <svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    <p class="text-sm font-bold text-[#50443C] mb-1">Nenhum colaborador cadastrado</p>
+    <p class="text-xs text-gray-400 mb-4">Comece cadastrando os colaboradores que farão plantões.</p>
+    <a href="{% url 'cadastrar_colaborador' %}" class="px-4 py-2 rounded-xl text-xs font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors">Cadastrar Colaborador</a>
+  </div>
+  {% endif %}
 </div>
 
-<!-- Card de ajuda -->
-<div class="card mt-4">
-    <div class="card-header">
-        <i class="bi bi-question-circle"></i> Como funciona a ordem da fila?
+<!-- Info sobre a fila -->
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+  <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+    <div class="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
+      <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     </div>
-    <div class="card-body">
-        <p>A <strong>ordem da fila</strong> determina a sequência em que os colaboradores serão escalados para os plantões.</p>
-        <ul>
-            <li>O colaborador com ordem <strong>1</strong> é o primeiro da fila</li>
-            <li>A cada semana, a fila avança 2 posições</li>
-            <li>Quando chega ao fim da fila, ela recomeça do início (circular)</li>
-            <li>Colaboradores <strong>inativos</strong> não aparecem na escala automática</li>
-        </ul>
-        <div class="alert alert-info mb-0">
-            <i class="bi bi-lightbulb"></i> 
-            <strong>Dica:</strong> Você pode reordenar os colaboradores editando o campo "ordem_fila" de cada um.
-        </div>
+    <h2 class="text-sm font-bold text-[#50443C]">Como funciona a ordem da fila?</h2>
+  </div>
+  <div class="p-5">
+    <p class="text-xs text-gray-500 mb-3">A <span class="font-semibold text-[#50443C]">ordem da fila</span> determina a sequência em que os colaboradores serão escalados para os plantões.</p>
+    <ul class="space-y-1.5 text-xs text-gray-500">
+      <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span>O colaborador com ordem <span class="font-semibold text-[#50443C] mx-1">1</span> é o primeiro da fila</li>
+      <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span>A cada semana, a fila avança 2 posições</li>
+      <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span>Quando chega ao fim, recomeça do início (circular)</li>
+      <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5 shrink-0"></span>Colaboradores <span class="font-semibold text-[#50443C] mx-1">inativos</span> não aparecem na escala automática</li>
+    </ul>
+    <div class="mt-4 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700 flex items-start gap-2">
+      <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Você pode reordenar os colaboradores editando o campo "Ordem na Fila" de cada um.
     </div>
+  </div>
 </div>
+
 {% endblock %}

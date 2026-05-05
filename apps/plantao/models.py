@@ -25,16 +25,25 @@ class Plantao(models.Model):
     """Modelo principal para gerenciar plantões"""
     
     DIAS_SEMANA = [
+        ('SEG', 'Segunda-feira'),
+        ('TER', 'Terça-feira'),
+        ('QUA', 'Quarta-feira'),
+        ('QUI', 'Quinta-feira'),
+        ('SEX', 'Sexta-feira'),
         ('SAB', 'Sábado'),
         ('DOM', 'Domingo'),
     ]
-    
+
     TURNOS = [
-        ('SABADO_TARDE1', 'Sábado 13:00 - 17:00'),
-        ('SABADO_TARDE2', 'Sábado 17:00 - 21:00'),
-        ('DOMINGO_MANHA', 'Domingo 08:00 - 13:00'),
-        ('DOMINGO_TARDE1', 'Domingo 13:00 - 17:00'),
-        ('DOMINGO_TARDE2', 'Domingo 17:00 - 21:00'),
+        ('SABADO_TARDE1',  'Sábado 13:00 – 17:00'),
+        ('SABADO_TARDE2',  'Sábado 17:00 – 21:00'),
+        ('DOMINGO_MANHA',  'Domingo 08:00 – 13:00'),
+        ('DOMINGO_TARDE1', 'Domingo 13:00 – 17:00'),
+        ('DOMINGO_TARDE2', 'Domingo 17:00 – 21:00'),
+        ('AVULSO_MANHA',   'Avulso 08:00 – 13:00'),
+        ('AVULSO_TARDE1',  'Avulso 13:00 – 17:00'),
+        ('AVULSO_TARDE2',  'Avulso 17:00 – 21:00'),
+        ('AVULSO_DIA_TODO','Avulso 08:00 – 18:00'),
     ]
     
     colaborador = models.ForeignKey(
@@ -69,34 +78,33 @@ class Plantao(models.Model):
             if self.hora_fim <= self.hora_inicio:
                 raise ValidationError('Hora de fim deve ser maior que hora de início')
     
+    _DIA_MAP = {0: 'SEG', 1: 'TER', 2: 'QUA', 3: 'QUI', 4: 'SEX', 5: 'SAB', 6: 'DOM'}
+
     @staticmethod
     def get_horarios_por_turno(turno):
-        """Retorna os horários corretos baseado no turno"""
         horarios = {
-            'SABADO_TARDE1': (time(13, 0), time(17, 0)),
-            'SABADO_TARDE2': (time(17, 0), time(21, 0)),
-            'DOMINGO_MANHA': (time(8, 0), time(13, 0)),
-            'DOMINGO_TARDE1': (time(13, 0), time(17, 0)),
-            'DOMINGO_TARDE2': (time(17, 0), time(21, 0)),
+            'SABADO_TARDE1':   (time(13, 0), time(17, 0)),
+            'SABADO_TARDE2':   (time(17, 0), time(21, 0)),
+            'DOMINGO_MANHA':   (time(8,  0), time(13, 0)),
+            'DOMINGO_TARDE1':  (time(13, 0), time(17, 0)),
+            'DOMINGO_TARDE2':  (time(17, 0), time(21, 0)),
+            'AVULSO_MANHA':    (time(8,  0), time(13, 0)),
+            'AVULSO_TARDE1':   (time(13, 0), time(17, 0)),
+            'AVULSO_TARDE2':   (time(17, 0), time(21, 0)),
+            'AVULSO_DIA_TODO': (time(8,  0), time(18, 0)),
         }
         return horarios.get(turno, (None, None))
-    
+
     def save(self, *args, **kwargs):
-        # Definir automaticamente os horários baseado no turno
         if self.turno:
             inicio, fim = self.get_horarios_por_turno(self.turno)
             if inicio and fim:
                 self.hora_inicio = inicio
                 self.hora_fim = fim
-        
-        # Definir o dia da semana baseado na data
+
         if self.data:
-            dia = self.data.weekday()
-            if dia == 5:  # Sábado
-                self.dia_semana = 'SAB'
-            elif dia == 6:  # Domingo
-                self.dia_semana = 'DOM'
-        
+            self.dia_semana = self._DIA_MAP.get(self.data.weekday(), '')
+
         super().save(*args, **kwargs)
 
 

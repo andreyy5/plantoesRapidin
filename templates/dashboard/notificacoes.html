@@ -1,116 +1,99 @@
 {% extends 'base.html' %}
-
-{% block title %}Notificações - Sistema de Plantões{% endblock %}
+{% block title %}Notificações - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
-            <i class="bi bi-bell"></i> Notificações
-            {% if nao_lidas > 0 %}
-            <span class="badge rounded-pill ms-2" style="background: #ef4444; color: #fff; font-size: 0.7rem; vertical-align: middle;">
-                {{ nao_lidas }} nova{{ nao_lidas|pluralize:"s" }}
-            </span>
-            {% endif %}
-        </h2>
-        <p class="text-muted">Acompanhe suas notificações de troca</p>
+
+<!-- Cabeçalho -->
+<div class="flex items-center justify-between flex-wrap gap-3">
+  <div>
+    <div class="flex items-center gap-2">
+      <h1 class="text-lg font-bold text-[#50443C]">Notificações</h1>
+      {% if nao_lidas > 0 %}
+      <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white">{{ nao_lidas }} nova{{ nao_lidas|pluralize:"s" }}</span>
+      {% endif %}
     </div>
-    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Voltar
-    </a>
+    <p class="text-xs text-gray-400 font-medium mt-0.5">Acompanhe suas notificações de troca</p>
+  </div>
+  <a href="{% url 'dashboard' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    Voltar
+  </a>
 </div>
 
 {% if notificacoes %}
-<div class="card">
-    <div class="card-body p-0">
-        {% for notif in notificacoes %}
-        <div class="p-4 d-flex align-items-start gap-3"
-             style="border-bottom: 1px solid rgba(255, 102, 0, 0.08);
-                    {% if not notif.lida %}background: rgba(255, 102, 0, 0.04);{% endif %}
-                    transition: all 0.3s ease;">
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+  {% for notif in notificacoes %}
+  <div class="flex items-start gap-4 px-5 py-4 border-b border-gray-50 last:border-b-0 {% if not notif.lida %}bg-[#E94920]/[0.02]{% endif %} hover:bg-gray-50/50 transition-colors">
 
-            <!-- Ícone por tipo -->
-            <div class="flex-shrink-0">
-                {% if notif.tipo == 'TROCA_SOLICITADA' %}
-                <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(251, 146, 60, 0.15); border: 1px solid #fb923c; display: flex; align-items: center; justify-content: center;">
-                    <i class="bi bi-arrow-left-right" style="color: #fb923c; font-size: 1.1rem;"></i>
-                </div>
-                {% elif notif.tipo == 'TROCA_ACEITA' %}
-                <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; display: flex; align-items: center; justify-content: center;">
-                    <i class="bi bi-check-circle-fill" style="color: #10b981; font-size: 1.1rem;"></i>
-                </div>
-                {% elif notif.tipo == 'TROCA_RECUSADA' %}
-                <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; display: flex; align-items: center; justify-content: center;">
-                    <i class="bi bi-x-circle-fill" style="color: #ef4444; font-size: 1.1rem;"></i>
-                </div>
-                {% else %}
-                <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(156, 163, 175, 0.15); border: 1px solid #9ca3af; display: flex; align-items: center; justify-content: center;">
-                    <i class="bi bi-slash-circle" style="color: #9ca3af; font-size: 1.1rem;"></i>
-                </div>
-                {% endif %}
-            </div>
+    <!-- Ícone -->
+    <div class="shrink-0 mt-0.5">
+      {% if notif.tipo == 'TROCA_SOLICITADA' %}
+      <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-200 flex items-center justify-center">
+        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+      </div>
+      {% elif notif.tipo == 'TROCA_ACEITA' %}
+      <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-200 flex items-center justify-center">
+        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      {% elif notif.tipo == 'TROCA_RECUSADA' %}
+      <div class="w-9 h-9 rounded-xl bg-red-500/10 border border-red-200 flex items-center justify-center">
+        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      {% else %}
+      <div class="w-9 h-9 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center">
+        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+      </div>
+      {% endif %}
+    </div>
 
-            <!-- Conteúdo -->
-            <div class="flex-grow-1">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <strong style="{% if not notif.lida %}color: #ffffff;{% else %}color: #9ca3af;{% endif %}">
-                            {{ notif.titulo }}
-                        </strong>
-                        {% if not notif.lida %}
-                        <span class="badge ms-2" style="background: #ff6600; color: #000; font-size: 0.65rem; padding: 3px 8px;">Nova</span>
-                        {% endif %}
-                    </div>
-                    <small class="text-muted">{{ notif.criado_em|date:"d/m/Y H:i" }}</small>
-                </div>
-                <p class="mb-2 mt-1" style="{% if not notif.lida %}color: #d1d5db;{% else %}color: #6b7280;{% endif %}; font-size: 0.9rem;">
-                    {{ notif.mensagem }}
-                </p>
-
-                <!-- Ações por tipo -->
-                <div class="d-flex gap-2 flex-wrap">
-                    {% if notif.tipo == 'TROCA_SOLICITADA' and notif.troca and notif.troca.status == 'PENDENTE' %}
-                    <a href="{% url 'responder_troca' notif.troca.id 'aceitar' %}" 
-                       class="btn btn-sm btn-success"
-                       onclick="return confirm('Confirma aceitar a troca?')">
-                        <i class="bi bi-check-circle"></i> Aceitar
-                    </a>
-                    <a href="{% url 'responder_troca' notif.troca.id 'recusar' %}" 
-                       class="btn btn-sm btn-outline-danger"
-                       onclick="return confirm('Confirma recusar a troca?')">
-                        <i class="bi bi-x-circle"></i> Recusar
-                    </a>
-                    {% endif %}
-
-                    {% if not notif.lida %}
-                    <a href="{% url 'marcar_notificacao_lida' notif.id %}" 
-                       class="btn btn-sm btn-secondary">
-                        <i class="bi bi-check2"></i> Marcar como lida
-                    </a>
-                    {% endif %}
-
-                    {% if notif.troca %}
-                    <a href="{% url 'minhas_trocas' %}" class="btn btn-sm btn-secondary">
-                        <i class="bi bi-eye"></i> Ver trocas
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
+    <!-- Conteúdo -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-sm font-bold {% if not notif.lida %}text-[#50443C]{% else %}text-gray-400{% endif %}">{{ notif.titulo }}</span>
+          {% if not notif.lida %}
+          <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#E94920] text-white uppercase">Nova</span>
+          {% endif %}
         </div>
-        {% endfor %}
-    </div>
-</div>
-
-{% else %}
-<div class="card">
-    <div class="card-body text-center py-5">
-        <i class="bi bi-bell-slash fs-1 text-muted"></i>
-        <h5 class="mt-3 text-muted">Nenhuma notificação</h5>
-        <p class="text-muted">Você não tem notificações no momento.</p>
-        <a href="{% url 'dashboard' %}" class="btn btn-primary mt-2">
-            <i class="bi bi-house-door"></i> Voltar ao Dashboard
+        <span class="text-[10px] text-gray-400 shrink-0">{{ notif.criado_em|date:"d/m/Y H:i" }}</span>
+      </div>
+      <p class="text-xs {% if not notif.lida %}text-gray-600{% else %}text-gray-400{% endif %} mb-2">{{ notif.mensagem }}</p>
+      <div class="flex flex-wrap gap-2">
+        {% if notif.tipo == 'TROCA_SOLICITADA' and notif.troca and notif.troca.status == 'PENDENTE' %}
+        <a href="{% url 'responder_troca' notif.troca.id 'aceitar' %}"
+           onclick="return confirm('Confirma aceitar a troca?')"
+           class="px-3 py-1 rounded-lg text-[11px] font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+          Aceitar
         </a>
+        <a href="{% url 'responder_troca' notif.troca.id 'recusar' %}"
+           onclick="return confirm('Confirma recusar a troca?')"
+           class="px-3 py-1 rounded-lg text-[11px] font-bold bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+          Recusar
+        </a>
+        {% endif %}
+        {% if not notif.lida %}
+        <a href="{% url 'marcar_notificacao_lida' notif.id %}"
+           class="px-3 py-1 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
+          Marcar como lida
+        </a>
+        {% endif %}
+        {% if notif.troca %}
+        <a href="{% url 'minhas_trocas' %}"
+           class="px-3 py-1 rounded-lg text-[11px] font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+          Ver trocas
+        </a>
+        {% endif %}
+      </div>
     </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-14 text-center">
+  <svg class="w-12 h-12 text-gray-200 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+  <p class="text-sm font-bold text-[#50443C] mb-1">Nenhuma notificação</p>
+  <p class="text-xs text-gray-400 mb-4">Você não tem notificações no momento.</p>
+  <a href="{% url 'dashboard' %}" class="px-4 py-2 rounded-xl text-xs font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors">Voltar ao Dashboard</a>
 </div>
 {% endif %}
 

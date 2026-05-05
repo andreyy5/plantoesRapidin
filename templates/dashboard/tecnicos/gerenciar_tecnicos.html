@@ -1,98 +1,73 @@
 {% extends 'base.html' %}
-
-{% block title %}Gerenciar Técnicos{% endblock %}
+{% block title %}Gerenciar Técnicos - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
-            <i class="bi bi-tools"></i> Gerenciar Técnicos de Campo
-        </h2>
-        <p class="text-muted">Lista de todos os técnicos cadastrados</p>
-    </div>
-    <a href="{% url 'cadastrar_tecnico' %}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Novo Técnico
-    </a>
+
+<!-- Cabeçalho -->
+<div class="flex items-center justify-between flex-wrap gap-3">
+  <div>
+    <h1 class="text-lg font-bold text-[#50443C]">Gerenciar Técnicos de Campo</h1>
+    <p class="text-xs text-gray-400 font-medium mt-0.5">Lista de todos os técnicos cadastrados</p>
+  </div>
+  <a href="{% url 'cadastrar_tecnico' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Novo Técnico
+  </a>
 </div>
 
 {% if tecnicos %}
-<div class="card">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover table-plantoes mb-0">
-                <thead>
-                    <tr>
-                        <th>Ordem</th>
-                        <th>Nome</th>
-                        <th>Telefone</th>
-                        <th>Email</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center">Ações</th>
-                    </tr>
-                </thead>
-                <tbody style="background: transparent;">
-                    {% for tecnico in tecnicos %}
-                    <tr>
-                        <td>
-                            <span class="badge" style="background: rgba(156, 163, 175, 0.2); color: #fff; font-size: 0.9rem; padding: 8px 12px;">
-                                #{{ tecnico.ordem_fila }}
-                            </span>
-                        </td>
-                        <td>
-                            <strong>{{ tecnico.nome_completo }}</strong>
-                            {% if tecnico.user %}
-                            <br><small class="text-muted">
-                                <i class="bi bi-person-check"></i> Usuário: {{ tecnico.user.username }}
-                            </small>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if tecnico.telefone %}
-                                <i class="bi bi-telephone"></i> {{ tecnico.telefone }}
-                            {% else %}
-                                <span class="text-muted">--</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if tecnico.email %}
-                                <i class="bi bi-envelope"></i> {{ tecnico.email }}
-                            {% else %}
-                                <span class="text-muted">--</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            {% if tecnico.ativo %}
-                                <span class="badge" style="background: linear-gradient(135deg, #10b981, #059669) !important;">
-                                    <i class="bi bi-check-circle"></i> Ativo
-                                </span>
-                            {% else %}
-                                <span class="badge" style="background: rgba(239, 68, 68, 0.3); color: #ef4444; border: 1px solid #ef4444;">
-                                    <i class="bi bi-x-circle"></i> Inativo
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            <a href="{% url 'editar_tecnico' tecnico.id %}" class="btn btn-sm btn-outline-primary" title="Editar">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead>
+        <tr class="bg-gray-50/50">
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Ordem</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Nome</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Telefone</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Email</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center px-4 py-2.5 border-b border-gray-100">Status</th>
+          <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center px-4 py-2.5 border-b border-gray-100">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tecnico in tecnicos %}
+        <tr class="hover:bg-gray-50/70 transition-colors">
+          <td class="py-3 px-4 border-b border-gray-50">
+            <span class="inline-flex w-7 h-7 rounded-lg bg-gray-100 text-gray-500 text-xs font-bold items-center justify-center">{{ tecnico.ordem_fila }}</span>
+          </td>
+          <td class="py-3 px-4 border-b border-gray-50">
+            <p class="text-sm font-semibold text-[#50443C]">{{ tecnico.nome_completo }}</p>
+            {% if tecnico.user %}
+            <p class="text-[10px] text-gray-400 mt-0.5">Usuário: {{ tecnico.user.username }}</p>
+            {% endif %}
+          </td>
+          <td class="py-3 px-4 text-xs text-gray-500 border-b border-gray-50">{{ tecnico.telefone|default:"--" }}</td>
+          <td class="py-3 px-4 text-xs text-gray-500 border-b border-gray-50 max-w-[160px] truncate">{{ tecnico.email|default:"--" }}</td>
+          <td class="py-3 px-4 text-center border-b border-gray-50">
+            {% if tecnico.ativo %}
+            <span class="inline-flex px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-500/10 text-emerald-700">Ativo</span>
+            {% else %}
+            <span class="inline-flex px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-red-500/10 text-red-500">Inativo</span>
+            {% endif %}
+          </td>
+          <td class="py-3 px-4 text-center border-b border-gray-50">
+            <a href="{% url 'editar_tecnico' tecnico.id %}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              Editar
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% else %}
-<div class="card">
-    <div class="card-body text-center py-5">
-        <i class="bi bi-tools fs-1 text-muted"></i>
-        <h4 class="mt-3 text-muted">Nenhum técnico cadastrado</h4>
-        <p class="text-muted">Comece adicionando técnicos à equipe.</p>
-        <a href="{% url 'cadastrar_tecnico' %}" class="btn btn-primary mt-3">
-            <i class="bi bi-plus-circle"></i> Cadastrar Primeiro Técnico
-        </a>
-    </div>
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-14 text-center">
+  <svg class="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+  <p class="text-sm font-bold text-[#50443C] mb-1">Nenhum técnico cadastrado</p>
+  <p class="text-xs text-gray-400 mb-4">Comece adicionando técnicos à equipe.</p>
+  <a href="{% url 'cadastrar_tecnico' %}" class="px-4 py-2 rounded-xl text-xs font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors">Cadastrar Técnico</a>
 </div>
 {% endif %}
 

@@ -1,64 +1,79 @@
 {% extends 'base.html' %}
-
-{% block title %}Confirmar Exclusão{% endblock %}
+{% block title %}Confirmar Exclusão - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="max-w-lg mx-auto flex flex-col gap-4">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between">
     <div>
-        <h2 class="mb-1" style="color: #ef4444; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
-            <i class="bi bi-exclamation-triangle"></i> Confirmar Exclusão
-        </h2>
-        <p class="text-muted">Esta ação não pode ser desfeita</p>
+      <h1 class="text-lg font-bold text-red-600">Confirmar Exclusão</h1>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">Esta ação não pode ser desfeita</p>
     </div>
-    <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Voltar
+    <a href="{% url 'dashboard_tecnicos' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+      Cancelar
     </a>
-</div>
+  </div>
 
-<div class="card" style="border-color: rgba(239, 68, 68, 0.3);">
-    <div class="card-header" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
-        <i class="bi bi-trash"></i> Excluir Plantão
+  <!-- Alerta -->
+  <div class="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-sm font-medium text-amber-700">
+    <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    <span><strong>Atenção!</strong> Esta ação é permanente e não pode ser desfeita.</span>
+  </div>
+
+  <!-- Dados do plantão -->
+  <div class="bg-white rounded-2xl border border-red-100 shadow-sm">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-red-50">
+      <div class="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">Plantão a ser excluído</h2>
     </div>
-    <div class="card-body">
-        <!-- Informações do Plantão -->
-        <div class="alert alert-danger">
-            <h5 class="mb-3"><i class="bi bi-info-circle"></i> Dados do Plantão:</h5>
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="mb-2"><strong>Data:</strong> {{ plantao.data|date:"d/m/Y" }} ({{ plantao.dia_semana }})</p>
-                    <p class="mb-2"><strong>Tipo:</strong> {{ plantao.get_tipo_display }}</p>
-                    <p class="mb-2"><strong>Horário:</strong> {{ plantao.hora_inicio|time:"H:i" }} - {{ plantao.hora_fim|time:"H:i" }}</p>
-                </div>
-                <div class="col-md-6">
-                    <p class="mb-2"><strong>Técnico Principal:</strong> {{ plantao.tecnico_principal.nome_completo }}</p>
-                    {% if plantao.tecnico_dupla %}
-                    <p class="mb-2"><strong>Técnico Dupla:</strong> {{ plantao.tecnico_dupla.nome_completo }}</p>
-                    {% endif %}
-                    {% if plantao.observacoes %}
-                    <p class="mb-0"><strong>Observações:</strong> {{ plantao.observacoes }}</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <p class="text-muted mb-4">
-            <i class="bi bi-exclamation-triangle"></i> 
-            Tem certeza que deseja excluir este plantão? Esta ação é <strong>permanente</strong> e não pode ser desfeita.
-        </p>
-
-        <!-- Formulário de Confirmação -->
-        <form method="post">
-            {% csrf_token %}
-            <div class="d-flex justify-content-between">
-                <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Cancelar
-                </a>
-                <button type="submit" class="btn btn-danger">
-                    <i class="bi bi-trash"></i> Sim, Excluir Plantão
-                </button>
-            </div>
-        </form>
+    <div class="p-5 flex flex-col gap-3">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-gray-400 w-28">Data</span>
+        <span class="text-sm text-[#50443C]">{{ plantao.data|date:"d/m/Y" }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-gray-400 w-28">Tipo</span>
+        <span class="text-sm text-[#50443C]">{{ plantao.get_tipo_display }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-gray-400 w-28">Horário</span>
+        <span class="text-sm text-[#50443C]">{{ plantao.hora_inicio|time:"H:i" }} – {{ plantao.hora_fim|time:"H:i" }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-gray-400 w-28">Téc. Principal</span>
+        <span class="text-sm font-semibold text-[#50443C]">{{ plantao.tecnico_principal.nome_completo }}</span>
+      </div>
+      {% if plantao.tecnico_dupla %}
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-gray-400 w-28">Téc. Dupla</span>
+        <span class="text-sm text-[#50443C]">{{ plantao.tecnico_dupla.nome_completo }}</span>
+      </div>
+      {% endif %}
+      {% if plantao.observacoes %}
+      <div class="flex items-start gap-2 pt-2 border-t border-gray-100">
+        <span class="text-xs font-bold text-gray-400 w-28 mt-0.5">Observações</span>
+        <span class="text-xs text-gray-500">{{ plantao.observacoes }}</span>
+      </div>
+      {% endif %}
     </div>
-</div>
+  </div>
 
+  <!-- Confirmação -->
+  <form method="post">
+    {% csrf_token %}
+    <div class="flex items-center justify-between">
+      <a href="{% url 'dashboard_tecnicos' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+        Não, manter
+      </a>
+      <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition-colors">
+        Sim, excluir plantão
+      </button>
+    </div>
+  </form>
+
+</div>
 {% endblock %}

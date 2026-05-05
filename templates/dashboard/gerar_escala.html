@@ -1,150 +1,149 @@
 {% extends 'base.html' %}
-
-{% block title %}Gerar Escala Automática - Sistema de Plantões{% endblock %}
+{% block title %}Gerar Escala Automática - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card" style="border: 2px solid rgba(255, 102, 0, 0.4);">
-            <div class="card-header" style="background: linear-gradient(135deg, rgba(255, 102, 0, 0.15) 0%, rgba(255, 140, 0, 0.08) 100%);">
-                <h4 class="mb-0" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;">
-                    <i class="bi bi-magic"></i> Gerar Escala Automática
-                </h4>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info" style="border: 2px solid #3b82f6; background: rgba(59, 130, 246, 0.1);">
-                    <h5 class="alert-heading" style="color: #3b82f6; font-weight: 700; text-transform: uppercase;">
-                        <i class="bi bi-info-circle"></i> Como funciona?
-                    </h5>
-                    <p>A escala automática segue as seguintes regras:</p>
-                    <ul class="mb-0">
-                        <li><strong style="color: #ff6600;">Sábado 13:00-17:00:</strong> Colaborador A (da fila)</li>
-                        <li><strong style="color: #ff6600;">Sábado 17:00-21:00:</strong> Colaborador B (próximo na fila)</li>
-                        <li><strong style="color: #10b981;">Domingo 08:00-13:00:</strong> Colaborador B (mesmo da noite de sábado)</li>
-                        <li><strong style="color: #10b981;">Domingo 13:00-17:00:</strong> Colaborador A (mesmo da tarde de sábado)</li>
-                        <li><strong style="color: #10b981;">Domingo 17:00-21:00:</strong> Colaborador C (próximo na fila)</li>
-                    </ul>
-                    <hr style="border-color: rgba(59, 130, 246, 0.3);">
-                    <p class="mb-0"><small>Na próxima semana, a fila avança 2 posições e o processo se repete.</small></p>
-                </div>
-                
-                <form method="post" class="mt-4">
-                    {% csrf_token %}
-                    
-                    <div class="mb-4">
-                        <label for="{{ form.data_inicio.id_for_label }}" class="form-label">
-                            {{ form.data_inicio.label }}
-                            <span style="color: #ef4444;">*</span>
-                        </label>
-                        {{ form.data_inicio }}
-                        {% if form.data_inicio.errors %}
-                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
-                                {{ form.data_inicio.errors }}
-                            </div>
-                        {% endif %}
-                        <small class="text-muted d-block mt-1">
-                            <i class="bi bi-exclamation-triangle" style="color: #fb923c;"></i> 
-                            A data deve ser um <strong>sábado</strong>
-                        </small>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label for="{{ form.semanas_gerar.id_for_label }}" class="form-label">
-                            {{ form.semanas_gerar.label }}
-                            <span style="color: #ef4444;">*</span>
-                        </label>
-                        {{ form.semanas_gerar }}
-                        {% if form.semanas_gerar.errors %}
-                            <div class="text-danger mt-1" style="font-size: 0.85rem;">
-                                {{ form.semanas_gerar.errors }}
-                            </div>
-                        {% endif %}
-                        <small class="text-muted d-block mt-1">Quantidade de semanas que serão geradas (1 a 12)</small>
-                    </div>
-                    
-                    <div class="alert alert-warning" style="border: 2px solid #fb923c; background: rgba(251, 146, 60, 0.1);">
-                        <i class="bi bi-exclamation-triangle" style="color: #fb923c;"></i> 
-                        <strong style="color: #fb923c;">Atenção:</strong> Certifique-se de que os colaboradores estão cadastrados e na ordem correta da fila antes de gerar a escala.
-                        <a href="{% url 'gerenciar_colaboradores' %}" class="alert-link" style="color: #ff6600; font-weight: 700;">Gerenciar Colaboradores</a>
-                    </div>
-                    
-                    <div class="d-flex justify-content-between mt-4">
-                        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Voltar
-                        </a>
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-magic"></i> Gerar Escala
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Preview da lógica -->
-        <div class="card mt-4" style="border: 2px solid rgba(16, 185, 129, 0.3);">
-            <div class="card-header" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);">
-                <h5 class="mb-0" style="color: #10b981; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                    <i class="bi bi-eye"></i> Exemplo de Escala
-                </h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Exemplo considerando 5 colaboradores: Andrey, Jose Neto, Karlos, Maria Eduarda, Angela</p>
-                
-                <div class="table-responsive">
-                    <table class="table table-bordered" style="border-color: rgba(255, 102, 0, 0.2);">
-                        <thead style="background: rgba(255, 102, 0, 0.1);">
-                            <tr>
-                                <th style="color: #ff6600; font-weight: 700; text-transform: uppercase;">Semana</th>
-                                <th style="color: #ff6600; font-weight: 700; text-transform: uppercase;">Sáb 13-17</th>
-                                <th style="color: #ff6600; font-weight: 700; text-transform: uppercase;">Sáb 17-21</th>
-                                <th style="color: #10b981; font-weight: 700; text-transform: uppercase;">Dom 08-13</th>
-                                <th style="color: #10b981; font-weight: 700; text-transform: uppercase;">Dom 13-17</th>
-                                <th style="color: #10b981; font-weight: 700; text-transform: uppercase;">Dom 17-21</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr style="border-bottom: 1px solid rgba(255, 102, 0, 0.1);">
-                                <td><strong style="color: #ff6600;">1</strong></td>
-                                <td>Andrey</td>
-                                <td>Jose Neto</td>
-                                <td>Jose Neto</td>
-                                <td>Andrey</td>
-                                <td>Karlos</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid rgba(255, 102, 0, 0.1);">
-                                <td><strong style="color: #ff6600;">2</strong></td>
-                                <td>Karlos</td>
-                                <td>Maria Eduarda</td>
-                                <td>Maria Eduarda</td>
-                                <td>Karlos</td>
-                                <td>Angela</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid rgba(255, 102, 0, 0.1);">
-                                <td><strong style="color: #ff6600;">3</strong></td>
-                                <td>Angela</td>
-                                <td>Andrey</td>
-                                <td>Andrey</td>
-                                <td>Angela</td>
-                                <td>Jose Neto</td>
-                            </tr>
-                            <tr>
-                                <td><strong style="color: #ff6600;">4</strong></td>
-                                <td>Jose Neto</td>
-                                <td>Karlos</td>
-                                <td>Karlos</td>
-                                <td>Jose Neto</td>
-                                <td>Maria Eduarda</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <small class="text-muted">
-                    <i class="bi bi-info-circle" style="color: #3b82f6;"></i> 
-                    Note como a fila rotaciona mantendo a lógica: quem pega sábado à noite, pega domingo de manhã.
-                </small>
-            </div>
-        </div>
+<div class="max-w-2xl mx-auto flex flex-col gap-4">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-bold text-[#50443C]">Gerar Escala Automática</h1>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">Configure o período e gere os plantões automaticamente</p>
     </div>
+    <a href="{% url 'dashboard' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+      Voltar
+    </a>
+  </div>
+
+  <!-- Como funciona -->
+  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div class="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">Como funciona?</h2>
+    </div>
+    <div class="p-5">
+      <p class="text-xs text-gray-500 mb-3">A escala automática segue as seguintes regras por semana:</p>
+      <ul class="space-y-2 text-xs">
+        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-[#E94920]/10 text-[#E94920] font-bold text-[10px]">Sáb 13-17</span><span class="text-gray-500">Colaborador A (da fila)</span></li>
+        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-[#E94920]/10 text-[#E94920] font-bold text-[10px]">Sáb 17-21</span><span class="text-gray-500">Colaborador B (próximo na fila)</span></li>
+        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 font-bold text-[10px]">Dom 08-13</span><span class="text-gray-500">Colaborador B (mesmo do sábado à noite)</span></li>
+        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 font-bold text-[10px]">Dom 13-17</span><span class="text-gray-500">Colaborador A (mesmo do sábado à tarde)</span></li>
+        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 font-bold text-[10px]">Dom 17-21</span><span class="text-gray-500">Colaborador C (próximo na fila)</span></li>
+      </ul>
+      <p class="text-[10px] text-gray-400 mt-3">Na próxima semana, a fila avança 2 posições e o processo se repete.</p>
+    </div>
+  </div>
+
+  <!-- Formulário -->
+  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div class="w-7 h-7 rounded-lg bg-[#E94920]/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-[#E94920]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">Configurações</h2>
+    </div>
+    <div class="p-5">
+      <form method="post" class="flex flex-col gap-4">
+        {% csrf_token %}
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-[#50443C]">
+            {{ form.data_inicio.label }} <span class="text-red-400">*</span>
+          </label>
+          {{ form.data_inicio }}
+          {% if form.data_inicio.errors %}
+          <p class="text-xs text-red-500">{{ form.data_inicio.errors|join:", " }}</p>
+          {% endif %}
+          <p class="text-[10px] text-amber-600 flex items-center gap-1">
+            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            A data deve ser um <strong class="ml-0.5">sábado</strong>
+          </p>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-[#50443C]">
+            {{ form.semanas_gerar.label }} <span class="text-red-400">*</span>
+          </label>
+          {{ form.semanas_gerar }}
+          {% if form.semanas_gerar.errors %}
+          <p class="text-xs text-red-500">{{ form.semanas_gerar.errors|join:", " }}</p>
+          {% endif %}
+          <p class="text-[10px] text-gray-400">Quantidade de semanas a gerar (1 a 12)</p>
+        </div>
+
+        <div class="flex items-start gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700">
+          <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          Certifique-se de que os colaboradores estão cadastrados e na ordem correta da fila antes de gerar a escala.
+          <a href="{% url 'gerenciar_colaboradores' %}" class="underline font-bold ml-1">Gerenciar Colaboradores</a>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <a href="{% url 'dashboard' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+            Cancelar
+          </a>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+            Gerar Escala
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Exemplo de escala -->
+  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">Exemplo de Escala</h2>
+    </div>
+    <div class="p-5">
+      <p class="text-xs text-gray-400 mb-3">Exemplo com 5 colaboradores: Andrey, Jose Neto, Karlos, Maria Eduarda, Angela</p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="text-[10px] font-bold text-gray-400 uppercase px-3 py-2 text-left border-b border-gray-100">Semana</th>
+              <th class="text-[10px] font-bold text-[#E94920] uppercase px-3 py-2 text-left border-b border-gray-100">Sáb 13-17</th>
+              <th class="text-[10px] font-bold text-[#E94920] uppercase px-3 py-2 text-left border-b border-gray-100">Sáb 17-21</th>
+              <th class="text-[10px] font-bold text-emerald-600 uppercase px-3 py-2 text-left border-b border-gray-100">Dom 08-13</th>
+              <th class="text-[10px] font-bold text-emerald-600 uppercase px-3 py-2 text-left border-b border-gray-100">Dom 13-17</th>
+              <th class="text-[10px] font-bold text-emerald-600 uppercase px-3 py-2 text-left border-b border-gray-100">Dom 17-21</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="hover:bg-gray-50/70">
+              <td class="px-3 py-2 font-bold text-[#E94920] border-b border-gray-50">1</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Andrey</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Jose Neto</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Jose Neto</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Andrey</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Karlos</td>
+            </tr>
+            <tr class="hover:bg-gray-50/70">
+              <td class="px-3 py-2 font-bold text-[#E94920] border-b border-gray-50">2</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Karlos</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Maria E.</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Maria E.</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Karlos</td>
+              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Angela</td>
+            </tr>
+            <tr class="hover:bg-gray-50/70">
+              <td class="px-3 py-2 font-bold text-[#E94920]">3</td>
+              <td class="px-3 py-2 text-[#50443C]">Angela</td>
+              <td class="px-3 py-2 text-[#50443C]">Andrey</td>
+              <td class="px-3 py-2 text-[#50443C]">Andrey</td>
+              <td class="px-3 py-2 text-[#50443C]">Angela</td>
+              <td class="px-3 py-2 text-[#50443C]">Jose Neto</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

@@ -1,78 +1,83 @@
 {% extends 'base.html' %}
-
-{% block title %}Editar Plantão Técnico{% endblock %}
+{% block title %}Editar Plantão Técnico - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="max-w-2xl mx-auto flex flex-col gap-4">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between">
     <div>
-        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
-            <i class="bi bi-pencil"></i> Editar Plantão Técnico
-        </h2>
-        <p class="text-muted">{{ plantao.data|date:"d/m/Y" }} - {{ plantao.get_tipo_display }}</p>
+      <h1 class="text-lg font-bold text-[#50443C]">Editar Plantão Técnico</h1>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">{{ plantao.data|date:"d/m/Y" }} – {{ plantao.get_tipo_display }}</p>
     </div>
-    <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Voltar
+    <a href="{% url 'dashboard_tecnicos' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+      Voltar
     </a>
-</div>
+  </div>
 
-<div class="card">
-    <div class="card-body">
-        <form method="post">
-            {% csrf_token %}
-            
-            <!-- Info do tipo (não editável) -->
-            <div class="alert alert-info mb-4">
-                <i class="bi bi-info-circle"></i>
-                <strong>Tipo:</strong> {{ plantao.get_tipo_display }}<br>
-                <strong>Horário:</strong> {{ plantao.hora_inicio|time:"H:i" }} - {{ plantao.hora_fim|time:"H:i" }}<br>
-                <small class="text-muted">O tipo e horário não podem ser alterados. Para mudar, delete e crie um novo plantão.</small>
-            </div>
-
-            <div class="row">
-                <!-- Técnico Principal -->
-                <div class="col-md-6 mb-3">
-                    <label for="tecnico_principal" class="form-label">Técnico Principal</label>
-                    <select class="form-select" id="tecnico_principal" name="tecnico_principal" required>
-                        {% for tecnico in tecnicos %}
-                        <option value="{{ tecnico.id }}" {% if tecnico.id == plantao.tecnico_principal.id %}selected{% endif %}>
-                            {{ tecnico.nome_completo }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Técnico Dupla (se for sábado) -->
-                {% if plantao.tipo == 'SABADO_DUPLA' %}
-                <div class="col-md-6 mb-3">
-                    <label for="tecnico_dupla" class="form-label">Técnico Dupla</label>
-                    <select class="form-select" id="tecnico_dupla" name="tecnico_dupla" required>
-                        {% for tecnico in tecnicos %}
-                        <option value="{{ tecnico.id }}" {% if plantao.tecnico_dupla and tecnico.id == plantao.tecnico_dupla.id %}selected{% endif %}>
-                            {{ tecnico.nome_completo }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Observações -->
-            <div class="mb-3">
-                <label for="observacoes" class="form-label">Observações</label>
-                <textarea class="form-control" id="observacoes" name="observacoes" rows="3">{{ plantao.observacoes|default:"" }}</textarea>
-            </div>
-
-            <!-- Botões -->
-            <div class="d-flex justify-content-between">
-                <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Cancelar
-                </a>
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-save"></i> Salvar Alterações
-                </button>
-            </div>
-        </form>
+  <!-- Info do tipo (não editável) -->
+  <div class="flex items-start gap-3 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700">
+    <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <div>
+      <p><strong>Tipo:</strong> {{ plantao.get_tipo_display }} &nbsp;|&nbsp; <strong>Horário:</strong> {{ plantao.hora_inicio|time:"H:i" }} – {{ plantao.hora_fim|time:"H:i" }}</p>
+      <p class="text-blue-500 mt-0.5">O tipo e horário não podem ser alterados. Para mudar, delete e crie um novo plantão.</p>
     </div>
-</div>
+  </div>
 
+  <!-- Formulário -->
+  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div class="w-7 h-7 rounded-lg bg-[#E94920]/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-[#E94920]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">Editar Dados</h2>
+    </div>
+    <div class="p-5">
+      <form method="post" class="flex flex-col gap-4">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1.5">
+            <label for="tecnico_principal" class="text-xs font-semibold text-[#50443C]">Técnico Principal <span class="text-red-400">*</span></label>
+            <select id="tecnico_principal" name="tecnico_principal" required
+                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
+              {% for tecnico in tecnicos %}
+              <option value="{{ tecnico.id }}" {% if tecnico.id == plantao.tecnico_principal.id %}selected{% endif %}>{{ tecnico.nome_completo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% if plantao.tipo == 'SABADO_DUPLA' %}
+          <div class="flex flex-col gap-1.5">
+            <label for="tecnico_dupla" class="text-xs font-semibold text-[#50443C]">Técnico Dupla <span class="text-red-400">*</span></label>
+            <select id="tecnico_dupla" name="tecnico_dupla" required
+                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
+              {% for tecnico in tecnicos %}
+              <option value="{{ tecnico.id }}" {% if plantao.tecnico_dupla and tecnico.id == plantao.tecnico_dupla.id %}selected{% endif %}>{{ tecnico.nome_completo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label for="observacoes" class="text-xs font-semibold text-[#50443C]">Observações</label>
+          <textarea id="observacoes" name="observacoes" rows="3"
+                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors resize-none">{{ plantao.observacoes|default:"" }}</textarea>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <a href="{% url 'dashboard_tecnicos' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+            Cancelar
+          </a>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+            Salvar Alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
 {% endblock %}

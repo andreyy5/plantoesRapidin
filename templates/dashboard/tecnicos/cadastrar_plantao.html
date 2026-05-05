@@ -1,111 +1,113 @@
 {% extends 'base.html' %}
-
-{% block title %}Cadastrar Plantão Técnico{% endblock %}
+{% block title %}Cadastrar Plantão Técnico - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="max-w-2xl mx-auto flex flex-col gap-4">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between">
     <div>
-        <h2 class="mb-1" style="color: #ff6600; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">
-            <i class="bi bi-calendar-plus"></i> Cadastrar Plantão Técnico
-        </h2>
-        <p class="text-muted">Adicione um novo plantão manualmente</p>
+      <h1 class="text-lg font-bold text-[#50443C]">Cadastrar Plantão Técnico</h1>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">Adicione um novo plantão manualmente</p>
     </div>
-    <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Voltar
+    <a href="{% url 'dashboard_tecnicos' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+      Voltar
     </a>
-</div>
+  </div>
 
-<div class="card">
-    <div class="card-body">
-        <form method="post">
-            {% csrf_token %}
-            
-            <div class="row">
-                <!-- Tipo de Plantão -->
-                <div class="col-md-6 mb-3">
-                    <label for="tipo" class="form-label">Tipo de Plantão</label>
-                    <select class="form-select" id="tipo" name="tipo" required onchange="toggleDupla()">
-                        <option value="">Selecione...</option>
-                        <option value="SABADO_DUPLA">Sábado - Dupla (14:00-18:00)</option>
-                        <option value="DOMINGO_SOLO">Domingo - Solo (Dia Todo)</option>
-                        <option value="AVULSO_SOLO">Dia Avulso - Solo (Dia Todo)</option>
-                    </select>
-                    <small class="text-muted d-block mt-1">
-                        <i class="bi bi-info-circle"></i> Horários são definidos automaticamente
-                    </small>
-                </div>
-
-                <!-- Data -->
-                <div class="col-md-6 mb-3">
-                    <label for="data" class="form-label">Data</label>
-                    <input type="date" class="form-control" id="data" name="data" required>
-                </div>
-            </div>
-
-            <div class="row">
-                <!-- Técnico Principal -->
-                <div class="col-md-6 mb-3">
-                    <label for="tecnico_principal" class="form-label">Técnico Principal</label>
-                    <select class="form-select" id="tecnico_principal" name="tecnico_principal" required>
-                        <option value="">Selecione...</option>
-                        {% for tecnico in tecnicos %}
-                        <option value="{{ tecnico.id }}">{{ tecnico.nome_completo }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Técnico Dupla (apenas sábado) -->
-                <div class="col-md-6 mb-3" id="dupla-container" style="display: none;">
-                    <label for="tecnico_dupla" class="form-label">
-                        Técnico Dupla 
-                        <span class="badge bg-danger" style="font-size: 0.65rem;">Obrigatório para Sábado</span>
-                    </label>
-                    <select class="form-select" id="tecnico_dupla" name="tecnico_dupla">
-                        <option value="">Selecione...</option>
-                        {% for tecnico in tecnicos %}
-                        <option value="{{ tecnico.id }}">{{ tecnico.nome_completo }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-
-            <!-- Observações -->
-            <div class="mb-3">
-                <label for="observacoes" class="form-label">Observações (Opcional)</label>
-                <textarea class="form-control" id="observacoes" name="observacoes" rows="3" 
-                          placeholder="Adicione observações sobre este plantão..."></textarea>
-            </div>
-
-            <!-- Botões -->
-            <div class="d-flex justify-content-between">
-                <a href="{% url 'dashboard_tecnicos' %}" class="btn btn-secondary">
-                    <i class="bi bi-x-circle"></i> Cancelar
-                </a>
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-save"></i> Salvar Plantão
-                </button>
-            </div>
-        </form>
+  <!-- Formulário -->
+  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div class="w-7 h-7 rounded-lg bg-[#E94920]/10 flex items-center justify-center">
+        <svg class="w-4 h-4 text-[#E94920]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      </div>
+      <h2 class="text-sm font-bold text-[#50443C]">Dados do Plantão</h2>
     </div>
-</div>
+    <div class="p-5">
+      <form method="post" class="flex flex-col gap-4">
+        {% csrf_token %}
 
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1.5">
+            <label for="tipo" class="text-xs font-semibold text-[#50443C]">Tipo de Plantão <span class="text-red-400">*</span></label>
+            <select id="tipo" name="tipo" required onchange="toggleDupla()"
+                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
+              <option value="">Selecione...</option>
+              <option value="SABADO_DUPLA">Sábado – Dupla (14:00–18:00)</option>
+              <option value="DOMINGO_SOLO">Domingo – Solo (Dia Todo)</option>
+              <option value="AVULSO_SOLO">Avulso – Solo (Dia Todo)</option>
+            </select>
+            <p class="text-[10px] text-gray-400">Horários definidos automaticamente</p>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label for="data" class="text-xs font-semibold text-[#50443C]">Data <span class="text-red-400">*</span></label>
+            <input type="date" id="data" name="data" required
+                   class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1.5">
+            <label for="tecnico_principal" class="text-xs font-semibold text-[#50443C]">Técnico Principal <span class="text-red-400">*</span></label>
+            <select id="tecnico_principal" name="tecnico_principal" required
+                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
+              <option value="">Selecione...</option>
+              {% for tecnico in tecnicos %}
+              <option value="{{ tecnico.id }}">{{ tecnico.nome_completo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div id="dupla-container" class="flex flex-col gap-1.5 hidden">
+            <label for="tecnico_dupla" class="text-xs font-semibold text-[#50443C]">
+              Técnico Dupla <span class="inline-flex ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-500/10 text-red-500 uppercase">Obrigatório p/ Sábado</span>
+            </label>
+            <select id="tecnico_dupla" name="tecnico_dupla"
+                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
+              <option value="">Selecione...</option>
+              {% for tecnico in tecnicos %}
+              <option value="{{ tecnico.id }}">{{ tecnico.nome_completo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label for="observacoes" class="text-xs font-semibold text-[#50443C]">Observações (Opcional)</label>
+          <textarea id="observacoes" name="observacoes" rows="3"
+                    placeholder="Observações sobre este plantão..."
+                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors resize-none"></textarea>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <a href="{% url 'dashboard_tecnicos' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+            Cancelar
+          </a>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+            Salvar Plantão
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 function toggleDupla() {
-    const tipo = document.getElementById('tipo').value;
-    const duplaContainer = document.getElementById('dupla-container');
-    const duplaSelect = document.getElementById('tecnico_dupla');
-    
-    if (tipo === 'SABADO_DUPLA') {
-        duplaContainer.style.display = 'block';
-        duplaSelect.required = true;
-    } else {
-        duplaContainer.style.display = 'none';
-        duplaSelect.required = false;
-        duplaSelect.value = '';
-    }
+  const tipo = document.getElementById('tipo').value;
+  const container = document.getElementById('dupla-container');
+  const select = document.getElementById('tecnico_dupla');
+  if (tipo === 'SABADO_DUPLA') {
+    container.classList.remove('hidden');
+    select.required = true;
+  } else {
+    container.classList.add('hidden');
+    select.required = false;
+    select.value = '';
+  }
 }
 </script>
 {% endblock %}
