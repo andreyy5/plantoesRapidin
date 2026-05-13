@@ -12,6 +12,7 @@ COPY . .
 # Coleta arquivos estáticos
 RUN python manage.py collectstatic --noinput
 # Porta padrão
-EXPOSE 8000
-# Inicia com Gunicorn
-CMD ["gunicorn", "core.wsgi:application", "--bind", "0.0.0.0:8000"]
+EXPOSE 5002
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+ENTRYPOINT ["sh", "entrypoint.sh"]
