@@ -1,4 +1,4 @@
 #!/bin/sh
 python manage.py migrate --noinput
 python manage.py createsuperuser --noinput || true
-exec gunicorn core.wsgi:application --bind 0.0.0.0:8000
+exec gunicorn core.wsgi:application --bind 0.0.0.0:5002
