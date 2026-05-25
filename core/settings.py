@@ -30,6 +30,12 @@ ALLOWED_HOSTS = [
 ]
 
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://plantoes.rapidin.net.br',
+    'https://www.plantoes.rapidin.net.br',
+]
+
+
 # Application definition
 
 INSTALLED_APPS = [
