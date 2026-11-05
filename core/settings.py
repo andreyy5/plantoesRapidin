@@ -23,7 +23,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-q14%f-n55+=kii+f^5c^*c3quuf2fa5pz1py0im!7r%$$(1s9c'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+# Desligado por padrão (produção). Para desenvolvimento local: DJANGO_DEBUG=1
+DEBUG = os.environ.get('DJANGO_DEBUG', '').lower() in ('1', 'true', 'sim')
 
 ALLOWED_HOSTS = [
     '*'
@@ -90,7 +91,9 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/data/db.sqlite3',
+        # Produção: /data/db.sqlite3 (volume persistente). NÃO alterar o padrão.
+        # Uso local: defina SQLITE_PATH apontando para o db.sqlite3 local.
+        'NAME': os.environ.get('SQLITE_PATH', '/data/db.sqlite3'),
     }
 }
 
@@ -119,7 +122,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Sao_Paulo'
 
 USE_I18N = True
 

@@ -1,0 +1,19 @@
+# Nada daqui deve entrar na imagem Docker.
+# O banco de produção fica no volume /data (SQLITE_PATH), nunca na imagem.
+.git
+.gitignore
+.dockerignore
+.env
+.env.*
+*.sqlite3
+*.sqlite3-journal
+staticfiles/
+**/__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+*.log
+.vscode/
+.idea/
+.claude/
