@@ -1,83 +1,102 @@
 {% extends 'base.html' %}
-{% block title %}Editar Plantão Técnico - Rapidin Plantões{% endblock %}
+{% block title %}Editar plantão de técnico - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto flex flex-col gap-4">
+<form method="post" id="form-tecnico" class="flex flex-col gap-4">
+  {% csrf_token %}
 
   <!-- Cabeçalho -->
-  <div class="flex items-center justify-between">
+  <div class="flex items-start justify-between gap-3 flex-wrap">
     <div>
-      <h1 class="text-lg font-bold text-[#50443C]">Editar Plantão Técnico</h1>
-      <p class="text-xs text-gray-400 font-medium mt-0.5">{{ plantao.data|date:"d/m/Y" }} – {{ plantao.get_tipo_display }}</p>
+      <h1 class="text-xl font-bold text-[#50443C]">Editar plantão de técnico</h1>
+      <p class="text-xs text-gray-400 font-medium mt-1">{{ plantao.dia_semana }}, {{ plantao.data|date:"d/m/Y" }} · {{ plantao.get_tipo_display }}</p>
     </div>
-    <a href="{% url 'dashboard_tecnicos' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
-      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard_tecnicos' %}{% endif %}"
+       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-600 hover:border-gray-300 transition-colors">
+      {% include 'partials/icon.html' with nome='arrow-left' classe='w-4 h-4' %}
       Voltar
     </a>
   </div>
 
-  <!-- Info do tipo (não editável) -->
-  <div class="flex items-start gap-3 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700">
-    <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <div>
-      <p><strong>Tipo:</strong> {{ plantao.get_tipo_display }} &nbsp;|&nbsp; <strong>Horário:</strong> {{ plantao.hora_inicio|time:"H:i" }} – {{ plantao.hora_fim|time:"H:i" }}</p>
-      <p class="text-blue-500 mt-0.5">O tipo e horário não podem ser alterados. Para mudar, delete e crie um novo plantão.</p>
-    </div>
-  </div>
+  <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
+    <div class="flex flex-col gap-4 min-w-0">
 
-  <!-- Formulário -->
-  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
-    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-      <div class="w-7 h-7 rounded-lg bg-[#E94920]/10 flex items-center justify-center">
-        <svg class="w-4 h-4 text-[#E94920]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+      <!-- Plantão (fixo) -->
+      <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 flex items-center gap-4 flex-wrap">
+        <div class="w-12 h-12 rounded-xl bg-[#E94920]/10 text-[#E94920] flex items-center justify-center shrink-0">
+          {% include 'partials/icon.html' with nome='calendar' classe='w-6 h-6' %}
+        </div>
+        <div class="min-w-0">
+          <p class="text-base font-bold text-[#50443C]">{{ plantao.dia_semana }}, {{ plantao.data|date:"d/m/Y" }}</p>
+          <p class="text-xs text-gray-400">{{ plantao.get_tipo_display }} · {{ plantao.hora_inicio|time:"H:i" }}–{{ plantao.hora_fim|time:"H:i" }}</p>
+        </div>
+        <p class="w-full sm:w-auto sm:ml-auto text-[11px] text-gray-400 max-w-xs">Data e tipo não mudam aqui. Para trocar, exclua e cadastre um novo plantão.</p>
+      </section>
+
+      <!-- Técnicos -->
+      <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5" aria-labelledby="titulo-tecnicos">
+        <h2 id="titulo-tecnicos" class="text-sm font-bold text-[#50443C] mb-4">Quem vai cobrir?</h2>
+        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Técnico responsável</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Técnico responsável">
+          {% for t in tecnicos %}{% include 'partials/cartao_pessoa.html' with campo='tecnico_principal' valor=t.id nome=t.nome_completo selecionado=plantao.tecnico_principal_id %}{% endfor %}
+        </div>
+        {% if plantao.tipo == 'SABADO_DUPLA' %}
+        <div class="mt-5 pt-5 border-t border-gray-100">
+          <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Dupla do sábado</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Dupla do sábado">
+            {% for t in tecnicos %}{% include 'partials/cartao_pessoa.html' with campo='tecnico_dupla' valor=t.id nome=t.nome_completo selecionado=plantao.tecnico_dupla_id %}{% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </section>
+
+      <!-- Observações -->
+      <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5">
+        <label for="observacoes" class="block text-sm font-bold text-[#50443C] mb-3">Observações <span class="text-xs font-medium text-gray-400">(opcional)</span></label>
+        <textarea id="observacoes" name="observacoes" rows="3"
+                  class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] focus:ring-2 focus:ring-[#E94920]/15 bg-white transition-colors resize-none">{{ plantao.observacoes|default:"" }}</textarea>
+      </section>
+    </div>
+
+    <!-- Ações -->
+    <aside class="lg:sticky lg:top-6 bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100"><h2 class="text-sm font-bold text-[#50443C]">Resumo</h2></div>
+      <dl class="px-5 py-4 flex flex-col gap-3 text-sm">
+        <div class="flex justify-between gap-3"><dt class="text-gray-400">Técnico</dt><dd id="r-principal" class="font-semibold text-right text-[#50443C] truncate">—</dd></div>
+        {% if plantao.tipo == 'SABADO_DUPLA' %}
+        <div class="flex justify-between gap-3"><dt class="text-gray-400">Dupla</dt><dd id="r-dupla" class="font-semibold text-right text-[#50443C] truncate">—</dd></div>
+        {% endif %}
+      </dl>
+      <div class="px-5 py-4 border-t border-gray-100 bg-gray-50/60 flex flex-col gap-2">
+        <button type="submit" class="w-full px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">Salvar alterações</button>
+        <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard_tecnicos' %}{% endif %}"
+           class="w-full text-center px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors">Cancelar</a>
+        <a href="{% url 'deletar_plantao_tecnico' plantao.id %}"
+           class="w-full text-center px-5 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-colors">Excluir este plantão</a>
       </div>
-      <h2 class="text-sm font-bold text-[#50443C]">Editar Dados</h2>
-    </div>
-    <div class="p-5">
-      <form method="post" class="flex flex-col gap-4">
-        {% csrf_token %}
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="flex flex-col gap-1.5">
-            <label for="tecnico_principal" class="text-xs font-semibold text-[#50443C]">Técnico Principal <span class="text-red-400">*</span></label>
-            <select id="tecnico_principal" name="tecnico_principal" required
-                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
-              {% for tecnico in tecnicos %}
-              <option value="{{ tecnico.id }}" {% if tecnico.id == plantao.tecnico_principal.id %}selected{% endif %}>{{ tecnico.nome_completo }}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          {% if plantao.tipo == 'SABADO_DUPLA' %}
-          <div class="flex flex-col gap-1.5">
-            <label for="tecnico_dupla" class="text-xs font-semibold text-[#50443C]">Técnico Dupla <span class="text-red-400">*</span></label>
-            <select id="tecnico_dupla" name="tecnico_dupla" required
-                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
-              {% for tecnico in tecnicos %}
-              <option value="{{ tecnico.id }}" {% if plantao.tecnico_dupla and tecnico.id == plantao.tecnico_dupla.id %}selected{% endif %}>{{ tecnico.nome_completo }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <label for="observacoes" class="text-xs font-semibold text-[#50443C]">Observações</label>
-          <textarea id="observacoes" name="observacoes" rows="3"
-                    class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors resize-none">{{ plantao.observacoes|default:"" }}</textarea>
-        </div>
-
-        <div class="flex items-center justify-between pt-2">
-          <a href="{% url 'dashboard_tecnicos' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
-            Cancelar
-          </a>
-          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
-            Salvar Alterações
-          </button>
-        </div>
-      </form>
-    </div>
+    </aside>
   </div>
+</form>
+{% endblock %}
 
-</div>
+{% block extra_js %}
+<script>
+(function () {
+  var form = document.getElementById('form-tecnico');
+  function marcado(nome) { return form.querySelector('input[name=' + nome + ']:checked'); }
+  function atualizar() {
+    var principal = marcado('tecnico_principal');
+    form.querySelectorAll('input[name=tecnico_dupla]').forEach(function (r) {
+      var mesmo = principal && r.value === principal.value;
+      r.disabled = mesmo;
+      if (mesmo && r.checked) r.checked = false;
+    });
+    var dupla = marcado('tecnico_dupla');
+    document.getElementById('r-principal').textContent = principal ? principal.dataset.rotulo : '—';
+    var rd = document.getElementById('r-dupla'); if (rd) rd.textContent = dupla ? dupla.dataset.rotulo : '—';
+  }
+  form.addEventListener('change', atualizar);
+  atualizar();
+})();
+</script>
 {% endblock %}

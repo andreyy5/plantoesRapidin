@@ -7,7 +7,12 @@ urlpatterns = [
     # Dashboard
     path('', views.dashboard, name='dashboard'),
     
+    # Relatórios
+    path('relatorios/', views.relatorios, name='relatorios'),
+    path('relatorios/pdf/', views.relatorio_pdf, name='relatorio_pdf'),
+
     # Plantões
+    path('checar/', views.checar_plantao, name='checar_plantao'),
     path('cadastrar/', views.cadastrar_plantao, name='cadastrar_plantao'),
     path('editar/<int:plantao_id>/', views.editar_plantao, name='editar_plantao'),
     path('deletar/<int:plantao_id>/', views.deletar_plantao, name='deletar_plantao'),

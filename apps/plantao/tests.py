@@ -181,7 +181,7 @@ class TelasTests(BaseViewTest):
         resp = self.client.get(reverse('cadastrar_plantao'),
                                {'data': self.sabado.isoformat(), 'turno': 'SABADO_TARDE2'})
         self.assertContains(resp, f'value="{self.sabado.isoformat()}"')
-        self.assertContains(resp, '<option value="SABADO_TARDE2" selected>')
+        self.assertRegex(resp.content.decode(), r'name="turno" value="SABADO_TARDE2"[^>]*checked')
 
     def test_volta_para_a_pagina_de_origem_mas_nunca_para_fora_do_site(self):
         self.client.force_login(self.admin)
@@ -273,3 +273,104 @@ class TrocaTests(BaseViewTest):
         p_c2.refresh_from_db()
         self.assertEqual(t.status, 'PENDENTE')
         self.assertEqual(p_c2.colaborador, self.c2)
+
+
+class ChecarPlantaoTests(BaseViewTest):
+    def test_informa_turnos_ocupados_e_regras(self):
+        domingo = self.sabado + timedelta(days=1)
+        Plantao.objects.create(colaborador=self.colabs[0], data=domingo, turno='DOMINGO_MANHA')
+        Plantao.objects.create(colaborador=self.colabs[1], data=domingo - timedelta(weeks=1),
+                               turno='DOMINGO_TARDE1')
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse('checar_plantao'), {
+            'data': domingo.isoformat(), 'turno': 'DOMINGO_TARDE2', 'colaborador': self.colabs[1].id,
+        })
+        dados = resp.json()
+        self.assertEqual(dados['ocupados'], {'DOMINGO_MANHA': 'Pessoa 1'})
+        self.assertEqual(len(dados['violacoes']), 1)       # domingos seguidos
+        self.assertIn('dias seguidos', dados['violacoes'][0])
+
+    def test_so_para_admin(self):
+        colab_user = User.objects.create_user('c', password='x')
+        self.client.force_login(colab_user)
+        resp = self.client.get(reverse('checar_plantao'), {'data': self.sabado.isoformat()})
+        self.assertEqual(resp.status_code, 302)
+
+
+class RelatorioTests(BaseViewTest):
+    def setUp(self):
+        super().setUp()
+        Plantao.objects.create(colaborador=self.colabs[0], data=self.sabado, turno='SABADO_TARDE1')
+        Plantao.objects.create(colaborador=self.colabs[0], data=self.sabado + timedelta(days=1),
+                               turno='DOMINGO_MANHA')
+        Plantao.objects.create(colaborador=self.colabs[1], data=self.sabado + timedelta(days=1),
+                               turno='DOMINGO_TARDE2', observacoes='Cobre & troca <ok>')
+        self.params = {'data_inicio': self.sabado.isoformat(),
+                       'data_fim': (self.sabado + timedelta(days=1)).isoformat()}
+
+    def test_tela_mostra_resumo_de_horas(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse('relatorios'), self.params)
+        self.assertEqual(resp.status_code, 200)
+        resumo = {l.nome: l for l in resp.context['dados']['resumo']}
+        self.assertEqual(resumo['Pessoa 1'].horas, 9)        # 4h + 5h
+        self.assertEqual(resumo['Pessoa 1'].fins_de_semana, 1)
+        self.assertEqual(resumo['Pessoa 2'].horas, 4)
+        self.assertEqual(resp.context['dados']['total'].horas, 13)
+
+    def test_pdf_com_os_mesmos_filtros(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse('relatorio_pdf'), {**self.params, 'pessoa': self.colabs[1].id})
+        self.assertEqual(resp['Content-Type'], 'application/pdf')
+        self.assertIn('attachment;', resp['Content-Disposition'])
+        self.assertTrue(resp.content.startswith(b'%PDF'))
+
+    def test_pdf_tecnicos_e_periodo_vazio(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse('relatorio_pdf'), {'area': 'tecnicos', **self.params})
+        self.assertTrue(resp.content.startswith(b'%PDF'))
+
+    def test_colaborador_nao_acessa(self):
+        u = User.objects.create_user('colab', password='x')
+        self.colabs[0].user = u
+        self.colabs[0].save()
+        self.client.force_login(u)
+        self.assertEqual(self.client.get(reverse('relatorios')).status_code, 302)
+        self.assertEqual(self.client.get(reverse('relatorio_pdf')).status_code, 302)
+
+
+class CadastroTecnicoTests(TestCase):
+    def setUp(self):
+        from .models import TecnicoCampo
+        self.admin = User.objects.create_superuser('admin', 'a@a.com', 'x')
+        self.t1 = TecnicoCampo.objects.create(nome_completo='Téc 1', ordem_fila=1)
+        self.t2 = TecnicoCampo.objects.create(nome_completo='Téc 2', ordem_fila=2)
+        self.sabado = escala.proximo_sabado(timezone.localdate())
+        self.client.force_login(self.admin)
+
+    def _post(self, **dados):
+        return self.client.post(reverse('cadastrar_plantao_tecnico'), dados)
+
+    def test_sabado_em_dia_errado_mantem_os_dados(self):
+        from .models import PlantaoTecnico
+        segunda = self.sabado + timedelta(days=2)
+        resp = self._post(tipo='SABADO_DUPLA', data=segunda.isoformat(),
+                          tecnico_principal=self.t1.id, tecnico_dupla=self.t2.id, observacoes='nota')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'precisa cair num sábado')
+        self.assertContains(resp, 'nota')
+        self.assertEqual(PlantaoTecnico.objects.count(), 0)
+
+    def test_dupla_igual_ao_principal(self):
+        resp = self._post(tipo='SABADO_DUPLA', data=self.sabado.isoformat(),
+                          tecnico_principal=self.t1.id, tecnico_dupla=self.t1.id)
+        self.assertContains(resp, 'precisa ser outro técnico')
+
+    def test_cadastra_e_bloqueia_duplicado_com_mensagem_clara(self):
+        from .models import PlantaoTecnico
+        dados = dict(tipo='SABADO_DUPLA', data=self.sabado.isoformat(),
+                     tecnico_principal=self.t1.id, tecnico_dupla=self.t2.id)
+        self.assertEqual(self._post(**dados).status_code, 302)
+        resp = self._post(**dados)
+        self.assertContains(resp, 'Já existe um plantão desse tipo nessa data')
+        self.assertEqual(PlantaoTecnico.objects.count(), 1)

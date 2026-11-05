@@ -10,7 +10,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Plantao, Colaborador, EscalaAutomatica, TrocaPlantao, Notificacao
 from .forms import PlantaoForm, ColaboradorForm, EscalaAutomaticaForm, FiltroPlantaoForm
 from . import escala
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.utils.dateparse import parse_date
+from urllib.parse import urlencode
+from . import relatorios as rel
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -344,12 +347,8 @@ def cadastrar_plantao(request):
             for campo in ('data', 'turno', 'colaborador') if request.GET.get(campo)
         })
     
-    context = {
-        'form': form,
-        'titulo': 'Cadastrar Plantão',
-    }
-    
-    return render(request, 'dashboard/cadastrar_plantao.html', context)
+    return render(request, 'dashboard/cadastrar_plantao.html',
+                  _contexto_form_plantao(form, 'Novo plantão'))
 
 
 @login_required
@@ -376,13 +375,8 @@ def editar_plantao(request, plantao_id):
     else:
         form = PlantaoForm(instance=plantao)
     
-    context = {
-        'form': form,
-        'titulo': 'Editar Plantão',
-        'plantao': plantao,
-    }
-    
-    return render(request, 'dashboard/cadastrar_plantao.html', context)
+    return render(request, 'dashboard/cadastrar_plantao.html',
+                  _contexto_form_plantao(form, 'Editar plantão', plantao))
 
 
 @login_required
@@ -999,6 +993,7 @@ _NAV_ITEM_POR_ROTA = {
     'cadastrar_plantao_tecnico': 'tec_novo',
     'gerar_escala_tecnicos': 'tec_gerar',
     'gerenciar_tecnicos': 'tec_lista', 'cadastrar_tecnico': 'tec_lista', 'editar_tecnico': 'tec_lista',
+    'relatorios': 'relatorios',
 }
 
 
@@ -1015,7 +1010,10 @@ def notificacoes_processor(request):
         'is_colaborador': False,
         'is_tecnico': False,
         'nav_ativo': nav_ativo,
-        'nav_area': 'tecnicos' if nav_ativo.startswith('tec_') else 'sac',
+        'nav_area': 'tecnicos' if (
+            nav_ativo.startswith('tec_')
+            or (nav_ativo == 'relatorios' and request.GET.get('area') == 'tecnicos')
+        ) else 'sac',
     }
     # Destino seguro para botões "Voltar"/"Cancelar" (?voltar_para=...)
     destino = request.GET.get('voltar_para', '')
@@ -1336,51 +1334,78 @@ def exportar_pdf_tecnicos(request):
     return response
 
 
+_TIPOS_TECNICO = (
+    {'valor': 'SABADO_DUPLA', 'dia': 'Sábado', 'formato': 'Dupla', 'horario': '14:00–18:00', 'weekday': 5},
+    {'valor': 'DOMINGO_SOLO', 'dia': 'Domingo', 'formato': 'Solo', 'horario': '08:00–18:00', 'weekday': 6},
+    {'valor': 'AVULSO_SOLO', 'dia': 'Avulso', 'formato': 'Solo', 'horario': '08:00–18:00', 'weekday': None},
+)
+
+
 @login_required
 @admin_required
 def cadastrar_plantao_tecnico(request):
     """Cadastrar plantão de técnico manualmente"""
-    
+
     from .models import PlantaoTecnico, TecnicoCampo
-    
+
+    campos = ('tipo', 'data', 'tecnico_principal', 'tecnico_dupla', 'observacoes')
+    valores = {c: request.GET.get(c, '') for c in campos}
+    erros = {}
+
     if request.method == 'POST':
-        tipo = request.POST.get('tipo')
-        data = request.POST.get('data')
-        tecnico_principal_id = request.POST.get('tecnico_principal')
-        tecnico_dupla_id = request.POST.get('tecnico_dupla')
-        observacoes = request.POST.get('observacoes', '')
-        
-        try:
-            tecnico_principal = TecnicoCampo.objects.get(id=tecnico_principal_id)
-            
-            plantao = PlantaoTecnico(
-                tecnico_principal=tecnico_principal,
-                data=data,
-                tipo=tipo,
-                observacoes=observacoes
+        valores = {c: request.POST.get(c, '').strip() for c in campos}
+        tipo = valores['tipo']
+        data = parse_date(valores['data'] or '')
+        ativos = TecnicoCampo.objects.filter(ativo=True)
+
+        if tipo not in dict(PlantaoTecnico.TIPO_CHOICES):
+            erros['tipo'] = 'Escolha o tipo de plantão.'
+        if not data:
+            erros['data'] = 'Informe uma data válida.'
+        elif tipo == 'SABADO_DUPLA' and data.weekday() != 5:
+            erros['data'] = 'O plantão de sábado precisa cair num sábado.'
+        elif tipo == 'DOMINGO_SOLO' and data.weekday() != 6:
+            erros['data'] = 'O plantão de domingo precisa cair num domingo.'
+
+        principal = ativos.filter(pk=valores['tecnico_principal']).first() if valores['tecnico_principal'].isdigit() else None
+        if not principal:
+            erros['tecnico_principal'] = 'Escolha o técnico responsável.'
+
+        dupla = None
+        if tipo == 'SABADO_DUPLA':
+            dupla = ativos.filter(pk=valores['tecnico_dupla']).first() if valores['tecnico_dupla'].isdigit() else None
+            if not dupla:
+                erros['tecnico_dupla'] = 'O plantão de sábado precisa de uma dupla.'
+            elif principal and dupla.pk == principal.pk:
+                erros['tecnico_dupla'] = 'A dupla precisa ser outro técnico.'
+
+        if not erros and PlantaoTecnico.objects.filter(data=data, tipo=tipo).exists():
+            erros['geral'] = 'Já existe um plantão desse tipo nessa data. Edite o plantão existente.'
+
+        if not erros:
+            PlantaoTecnico.objects.create(
+                tecnico_principal=principal, tecnico_dupla=dupla,
+                data=data, tipo=tipo, observacoes=valores['observacoes'],
             )
-            
-            if tipo == 'SABADO_DUPLA':
-                if not tecnico_dupla_id:
-                    messages.error(request, 'Plantão de sábado precisa de dupla!')
-                    return redirect('cadastrar_plantao_tecnico')
-                
-                tecnico_dupla = TecnicoCampo.objects.get(id=tecnico_dupla_id)
-                plantao.tecnico_dupla = tecnico_dupla
-            
-            plantao.save()
             messages.success(request, 'Plantão técnico cadastrado com sucesso!')
-            return redirect('dashboard_tecnicos')
-            
-        except Exception as e:
-            messages.error(request, f'Erro: {str(e)}')
-    
-    tecnicos = TecnicoCampo.objects.filter(ativo=True).order_by('nome_completo')
-    
+            return _redirecionar_para_origem(request, 'dashboard_tecnicos')
+
+        messages.error(request, 'Confira os campos destacados.')
+
+    sabado = escala.proximo_sabado(timezone.localdate())
     context = {
-        'tecnicos': tecnicos,
+        'tecnicos': TecnicoCampo.objects.filter(ativo=True).order_by('nome_completo'),
+        'valores': valores,
+        'erros': erros,
+        'tipos': _TIPOS_TECNICO,
+        'sugestoes_data': [
+            {'rotulo': f'Sáb {sabado:%d/%m}', 'valor': sabado},
+            {'rotulo': f'Dom {sabado + timedelta(days=1):%d/%m}', 'valor': sabado + timedelta(days=1)},
+            {'rotulo': f'Sáb {sabado + timedelta(weeks=1):%d/%m}', 'valor': sabado + timedelta(weeks=1)},
+            {'rotulo': f'Dom {sabado + timedelta(days=8):%d/%m}', 'valor': sabado + timedelta(days=8)},
+        ],
     }
-    
+
     return render(request, 'dashboard/tecnicos/cadastrar_plantao.html', context)
 
 
@@ -1560,10 +1585,13 @@ def editar_plantao_tecnico(request, plantao_id):
         plantao.save()
         
         messages.success(request, 'Plantão atualizado!')
-        return redirect('dashboard_tecnicos')
+        return _redirecionar_para_origem(request, 'dashboard_tecnicos')
     
-    tecnicos = TecnicoCampo.objects.filter(ativo=True)
-    
+    # Ativos + os técnicos atuais do plantão (mesmo que já inativos)
+    tecnicos = TecnicoCampo.objects.filter(
+        Q(ativo=True) | Q(pk=plantao.tecnico_principal_id) | Q(pk=plantao.tecnico_dupla_id)
+    ).order_by('nome_completo')
+
     context = {
         'plantao': plantao,
         'tecnicos': tecnicos,
@@ -1619,3 +1647,150 @@ def editar_tecnico(request, tecnico_id):
     }
     
     return render(request, 'dashboard/tecnicos/editar_tecnico.html', context)
+
+
+# ========== FORMULÁRIO DE PLANTÃO (SAC) ==========
+
+_GRUPOS_TURNO = (
+    ('Sábado', 'sab', ('SABADO_TARDE1', 'SABADO_TARDE2')),
+    ('Domingo', 'dom', ('DOMINGO_MANHA', 'DOMINGO_TARDE1', 'DOMINGO_TARDE2')),
+    ('Avulso', 'util', ('AVULSO_MANHA', 'AVULSO_TARDE1', 'AVULSO_TARDE2', 'AVULSO_DIA_TODO')),
+)
+
+
+def _contexto_form_plantao(form, titulo, plantao=None):
+    """Dados extras do formulário de plantão: turnos com horário e sugestões de data."""
+    turnos = []
+    for grupo, dia, codigos in _GRUPOS_TURNO:
+        for codigo in codigos:
+            ini, fim = Plantao.get_horarios_por_turno(codigo)
+            turnos.append({
+                'valor': codigo, 'grupo': grupo, 'dia': dia, 'inicio': ini, 'fim': fim,
+                'horas': rel._fmt_horas(rel._horas(ini, fim)),
+            })
+    sabado = escala.proximo_sabado(timezone.localdate())
+    return {
+        'form': form,
+        'titulo': titulo,
+        'plantao': plantao,
+        'turnos': turnos,
+        'sugestoes_data': [
+            {'rotulo': f'Sáb {sabado:%d/%m}', 'valor': sabado},
+            {'rotulo': f'Dom {sabado + timedelta(days=1):%d/%m}', 'valor': sabado + timedelta(days=1)},
+            {'rotulo': f'Sáb {sabado + timedelta(weeks=1):%d/%m}', 'valor': sabado + timedelta(weeks=1)},
+            {'rotulo': f'Dom {sabado + timedelta(days=8):%d/%m}', 'valor': sabado + timedelta(days=8)},
+        ],
+    }
+
+
+@login_required
+@admin_required
+def checar_plantao(request):
+    """
+    Consulta usada pelo formulário de plantão enquanto o admin preenche:
+    turnos já ocupados na data e regras que a escolha quebraria.
+    """
+    data = parse_date(request.GET.get('data') or '')
+    if not data:
+        return JsonResponse({'erro': 'Data inválida.'}, status=400)
+    ignorar = request.GET.get('ignorar', '')
+    ignorar = int(ignorar) if ignorar.isdigit() else None
+
+    ocupados = {
+        p.turno: p.colaborador.nome_completo
+        for p in Plantao.objects.filter(data=data).exclude(id=ignorar).select_related('colaborador')
+    }
+
+    violacoes = []
+    turno, colab = request.GET.get('turno', ''), request.GET.get('colaborador', '')
+    if turno in dict(Plantao.TURNOS) and colab.isdigit() and Colaborador.objects.filter(pk=colab).exists():
+        violacoes = [v.texto for v in escala.violacoes_novas(
+            remover_ids=[ignorar] if ignorar else [],
+            adicionar=[escala.Registro(ignorar, int(colab), data, turno)],
+        )]
+    return JsonResponse({'ocupados': ocupados, 'violacoes': violacoes})
+
+
+# ========== RELATÓRIOS ==========
+
+def _filtros_relatorio(request):
+    hoje = timezone.localdate()
+    area = request.GET.get('area')
+    area = area if area in dict(rel.AREAS) else 'sac'
+
+    inicio_mes = hoje.replace(day=1)
+    fim_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    inicio = parse_date(request.GET.get('data_inicio') or '') or inicio_mes
+    fim = parse_date(request.GET.get('data_fim') or '') or fim_mes
+    if fim < inicio:
+        inicio, fim = fim, inicio
+    limitado = (fim - inicio).days > 366
+    if limitado:
+        fim = inicio + timedelta(days=366)
+
+    pessoa_id = request.GET.get('pessoa', '')
+    pessoa = rel.pessoas_da_area(area).filter(pk=pessoa_id).first() if pessoa_id.isdigit() else None
+
+    return {
+        'area': area, 'inicio': inicio, 'fim': fim, 'pessoa': pessoa, 'limitado': limitado,
+        'detalhado': request.GET.get('detalhado', '1') != '0',
+    }
+
+
+def _dados_relatorio(f):
+    gerar = rel.dados_tecnicos if f['area'] == 'tecnicos' else rel.dados_sac
+    return gerar(f['inicio'], f['fim'], f['pessoa'])
+
+
+def _atalhos_relatorio(f, hoje):
+    def mes(ano, m):
+        ini = date(ano, m, 1)
+        return ini, (ini + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+
+    ano, m = hoje.year, hoje.month
+    anterior = mes(ano - (m == 1), (m - 2) % 12 + 1)
+    tres_meses = (mes(ano - (m <= 2), (m - 3) % 12 + 1)[0], mes(ano, m)[1])
+    opcoes = [('Este mês', mes(ano, m)), ('Mês passado', anterior),
+              ('Últimos 3 meses', tres_meses), ('Este ano', (date(ano, 1, 1), date(ano, 12, 31)))]
+    atalhos = []
+    for rotulo, (ini, fim) in opcoes:
+        params = {'area': f['area'], 'data_inicio': ini.isoformat(), 'data_fim': fim.isoformat()}
+        if f['pessoa']:
+            params['pessoa'] = f['pessoa'].pk
+        atalhos.append({'rotulo': rotulo, 'url': '?' + urlencode(params),
+                        'ativo': (f['inicio'], f['fim']) == (ini, fim)})
+    return atalhos
+
+
+@login_required
+@admin_required
+def relatorios(request):
+    """Relatórios de plantões com prévia na tela e exportação em PDF - APENAS ADMIN"""
+    f = _filtros_relatorio(request)
+    dados = _dados_relatorio(f)
+
+    params = {'area': f['area'], 'data_inicio': f['inicio'].isoformat(),
+              'data_fim': f['fim'].isoformat(), 'detalhado': '1' if f['detalhado'] else '0'}
+    if f['pessoa']:
+        params['pessoa'] = f['pessoa'].pk
+
+    return render(request, 'dashboard/relatorios.html', {
+        'f': f,
+        'dados': dados,
+        'areas': rel.AREAS,
+        'pessoas': rel.pessoas_da_area(f['area']),
+        'atalhos': _atalhos_relatorio(f, timezone.localdate()),
+        'url_pdf': f"{reverse('relatorio_pdf')}?{urlencode(params)}",
+    })
+
+
+@login_required
+@admin_required
+def relatorio_pdf(request):
+    """Baixa o relatório em PDF com os mesmos filtros da tela - APENAS ADMIN"""
+    f = _filtros_relatorio(request)
+    pdf = rel.gerar_pdf(_dados_relatorio(f), detalhado=f['detalhado'])
+    nome = f"relatorio_plantoes_{f['area']}_{f['inicio']:%Y%m%d}_{f['fim']:%Y%m%d}.pdf"
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{nome}"'
+    return response

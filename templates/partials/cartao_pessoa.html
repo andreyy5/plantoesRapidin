@@ -1,0 +1,10 @@
+{# Cartão de seleção de pessoa (radio). Parâmetros: campo, valor, nome, selecionado #}
+<label data-nome="{{ nome|lower }}" data-valor="{{ valor }}"
+       class="flex items-center gap-3 p-2.5 rounded-xl border-2 border-gray-200 cursor-pointer transition-colors hover:border-gray-300
+              has-[:checked]:border-[#E94920] has-[:checked]:bg-[#E94920]/5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#E94920]/30
+              has-[:disabled]:opacity-40 has-[:disabled]:cursor-not-allowed has-[:disabled]:hover:border-gray-200">
+  <input type="radio" name="{{ campo }}" value="{{ valor }}" class="sr-only" data-rotulo="{{ nome }}"
+         {% if selecionado|stringformat:'s' == valor|stringformat:'s' %}checked{% endif %}>
+  <span class="w-9 h-9 rounded-full bg-[#E94920]/10 text-[#E94920] text-sm font-bold flex items-center justify-center shrink-0 uppercase" aria-hidden="true">{{ nome|slice:":1" }}</span>
+  <span class="text-sm font-semibold text-[#50443C] truncate min-w-0">{{ nome }}</span>
+</label>

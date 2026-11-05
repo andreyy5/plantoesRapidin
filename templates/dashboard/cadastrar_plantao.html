@@ -2,197 +2,244 @@
 {% block title %}{{ titulo }} - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto flex flex-col gap-4">
+<form method="post" id="form-plantao" class="flex flex-col gap-4"
+      data-checar-url="{% url 'checar_plantao' %}" data-ignorar="{{ plantao.id|default:'' }}">
+  {% csrf_token %}
 
   <!-- Cabeçalho -->
-  <div class="flex items-center justify-between">
+  <div class="flex items-start justify-between gap-3 flex-wrap">
     <div>
-      <h1 class="text-lg font-bold text-[#50443C]">{{ titulo }}</h1>
-      <p class="text-xs text-gray-400 font-medium mt-0.5">Preencha os dados do plantão</p>
+      <h1 class="text-xl font-bold text-[#50443C]">{{ titulo }}</h1>
+      <p class="text-xs text-gray-400 font-medium mt-1">
+        {% if plantao %}{{ plantao.colaborador.nome_completo }} · {{ plantao.get_dia_semana_display }}, {{ plantao.data|date:"d/m/Y" }}{% else %}Escolha a data, o turno e quem vai cobrir{% endif %}
+      </p>
     </div>
-    <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard' %}{% endif %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
-      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard' %}{% endif %}"
+       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-600 hover:border-gray-300 transition-colors">
+      {% include 'partials/icon.html' with nome='arrow-left' classe='w-4 h-4' %}
       Voltar
     </a>
   </div>
 
-  <!-- Formulário -->
-  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
-    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-      <div class="w-7 h-7 rounded-lg bg-[#E94920]/10 flex items-center justify-center">
-        <svg class="w-4 h-4 text-[#E94920]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-      </div>
-      <h2 class="text-sm font-bold text-[#50443C]">Dados do Plantão</h2>
-    </div>
-    <div class="p-5">
-      <form method="post" class="flex flex-col gap-4">
-        {% csrf_token %}
+  {% if form.non_field_errors %}
+  <div class="flex items-start gap-2 px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-700" role="alert">
+    {% include 'partials/icon.html' with nome='error' classe='w-5 h-5 shrink-0' %}
+    <div>{% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}</div>
+  </div>
+  {% endif %}
 
-        {% if form.non_field_errors %}
-        <div class="px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-xs text-red-700">
-          {% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}
+  <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
+    <div class="flex flex-col gap-4 min-w-0">
+
+      <!-- 1. Data -->
+      <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5" aria-labelledby="passo-data">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-7 h-7 rounded-full bg-[#E94920] text-white text-xs font-bold flex items-center justify-center">1</span>
+          <h2 id="passo-data" class="text-sm font-bold text-[#50443C]">Quando é o plantão?</h2>
         </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="w-full sm:w-56">
+            <label for="{{ form.data.id_for_label }}" class="sr-only">Data do plantão</label>
+            {{ form.data }}
+          </div>
+          <span id="dia-semana" class="hidden px-3 py-1.5 rounded-lg text-xs font-bold"></span>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 mt-3">
+          <span class="text-[11px] text-gray-400 mr-1">Atalhos:</span>
+          {% for s in sugestoes_data %}
+          <button type="button" data-data="{{ s.valor|date:'Y-m-d' }}"
+                  class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-gray-100 text-gray-500 hover:bg-[#E94920]/10 hover:text-[#E94920] transition-colors">{{ s.rotulo }}</button>
+          {% endfor %}
+        </div>
+        {% if form.data.errors %}<p class="text-xs text-red-500 mt-2">{{ form.data.errors|join:", " }}</p>{% endif %}
+      </section>
+
+      <!-- 2. Turno -->
+      <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5" aria-labelledby="passo-turno">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-7 h-7 rounded-full bg-[#E94920] text-white text-xs font-bold flex items-center justify-center">2</span>
+          <h2 id="passo-turno" class="text-sm font-bold text-[#50443C]">Qual turno?</h2>
+        </div>
+        <p id="turno-vazio" class="text-xs text-gray-400 px-4 py-6 rounded-xl border-2 border-dashed border-gray-200 text-center">Escolha a data primeiro para ver os turnos daquele dia.</p>
+        <div id="lista-turnos" class="grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup" aria-labelledby="passo-turno">
+          {% for t in turnos %}
+          <label data-dia="{{ t.dia }}" data-turno="{{ t.valor }}"
+                 class="hidden relative flex-col gap-0.5 p-3 rounded-xl border-2 border-gray-200 cursor-pointer transition-colors hover:border-gray-300
+                        has-[:checked]:border-[#E94920] has-[:checked]:bg-[#E94920]/5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#E94920]/30
+                        has-[:disabled]:cursor-not-allowed has-[:disabled]:bg-gray-50 has-[:disabled]:opacity-60 has-[:disabled]:hover:border-gray-200">
+            <input type="radio" name="turno" value="{{ t.valor }}" class="sr-only" data-rotulo="{{ t.grupo }} {{ t.inicio|time:'H:i' }}–{{ t.fim|time:'H:i' }}"
+                   {% if form.turno.value == t.valor %}checked{% endif %}>
+            <span class="text-[10px] font-bold uppercase tracking-widest {% if t.dia == 'sab' %}text-[#E94920]{% elif t.dia == 'dom' %}text-emerald-600{% else %}text-blue-600{% endif %}">{{ t.grupo }}</span>
+            <span class="text-base font-bold text-[#50443C] tabular-nums">{{ t.inicio|time:"H:i" }}–{{ t.fim|time:"H:i" }}</span>
+            <span class="text-[11px] text-gray-400" data-info>{{ t.horas }}</span>
+            <span class="hidden text-[11px] font-semibold text-gray-500 truncate" data-ocupado></span>
+          </label>
+          {% endfor %}
+        </div>
+        {% if form.turno.errors %}<p class="text-xs text-red-500 mt-2">{{ form.turno.errors|join:", " }}</p>{% endif %}
+      </section>
+
+      <!-- 3. Colaborador -->
+      <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5" aria-labelledby="passo-colab">
+        <div class="flex items-center gap-3 mb-4 flex-wrap">
+          <span class="w-7 h-7 rounded-full bg-[#E94920] text-white text-xs font-bold flex items-center justify-center">3</span>
+          <h2 id="passo-colab" class="text-sm font-bold text-[#50443C]">Quem vai cobrir?</h2>
+          {% if form.fields.colaborador.queryset|length > 6 %}
+          <input type="search" id="busca-colab" placeholder="Buscar pelo nome…" aria-label="Buscar colaborador"
+                 class="ml-auto w-full sm:w-56 px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#E94920] focus:ring-2 focus:ring-[#E94920]/15">
+          {% endif %}
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-labelledby="passo-colab">
+          {% for c in form.fields.colaborador.queryset %}
+          <label data-nome="{{ c.nome_completo|lower }}"
+                 class="flex items-center gap-3 p-2.5 rounded-xl border-2 border-gray-200 cursor-pointer transition-colors hover:border-gray-300
+                        has-[:checked]:border-[#E94920] has-[:checked]:bg-[#E94920]/5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#E94920]/30">
+            <input type="radio" name="colaborador" value="{{ c.id }}" class="sr-only" data-rotulo="{{ c.nome_completo }}"
+                   {% if form.colaborador.value|stringformat:'s' == c.id|stringformat:'s' %}checked{% endif %}>
+            <span class="w-9 h-9 rounded-full bg-[#E94920]/10 text-[#E94920] text-sm font-bold flex items-center justify-center shrink-0 uppercase" aria-hidden="true">{{ c.nome_completo|slice:":1" }}</span>
+            <span class="min-w-0">
+              <span class="block text-sm font-semibold text-[#50443C] truncate">{{ c.nome_completo }}</span>
+              {% if not c.ativo %}<span class="block text-[11px] text-gray-400">Inativo</span>{% endif %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        {% if form.colaborador.errors %}<p class="text-xs text-red-500 mt-2">{{ form.colaborador.errors|join:", " }}</p>{% endif %}
+      </section>
+
+      <!-- Observações -->
+      <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5">
+        <label for="{{ form.observacoes.id_for_label }}" class="block text-sm font-bold text-[#50443C] mb-3">
+          Observações <span class="text-xs font-medium text-gray-400">(opcional)</span>
+        </label>
+        {{ form.observacoes }}
+      </section>
+    </div>
+
+    <!-- Resumo -->
+    <aside class="lg:sticky lg:top-6 bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="text-sm font-bold text-[#50443C]">Resumo</h2>
+      </div>
+      <dl class="px-5 py-4 flex flex-col gap-3 text-sm">
+        <div class="flex justify-between gap-3"><dt class="text-gray-400">Data</dt><dd id="r-data" class="font-semibold text-right text-[#50443C]">—</dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-gray-400">Turno</dt><dd id="r-turno" class="font-semibold text-right text-[#50443C]">—</dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-gray-400">Quem</dt><dd id="r-colab" class="font-semibold text-right text-[#50443C] truncate">—</dd></div>
+      </dl>
+      <div id="r-regras" class="hidden mx-5 mb-4 px-3 py-2.5 rounded-xl text-xs" aria-live="polite"></div>
+      <div class="px-5 py-4 border-t border-gray-100 bg-gray-50/60 flex flex-col gap-2">
+        <button type="submit" class="w-full px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+          {% if plantao %}Salvar alterações{% else %}Salvar plantão{% endif %}
+        </button>
+        <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard' %}{% endif %}"
+           class="w-full text-center px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors">Cancelar</a>
+        {% if plantao %}
+        <a href="{% url 'deletar_plantao' plantao.id %}{% if voltar_para %}?voltar_para={{ voltar_para|urlencode }}{% endif %}"
+           class="w-full text-center px-5 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-colors">Excluir este plantão</a>
         {% endif %}
-
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-[#50443C]">
-            {{ form.colaborador.label }} <span class="text-red-400">*</span>
-          </label>
-          {{ form.colaborador }}
-          {% if form.colaborador.errors %}
-          <p class="text-xs text-red-500">{{ form.colaborador.errors|join:", " }}</p>
-          {% endif %}
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-[#50443C]">
-            {{ form.data.label }} <span class="text-red-400">*</span>
-          </label>
-          {{ form.data }}
-          {% if form.data.errors %}
-          <p class="text-xs text-red-500">{{ form.data.errors|join:", " }}</p>
-          {% endif %}
-          <p id="dia-info" class="text-[10px] text-gray-400 hidden"></p>
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-[#50443C]">
-            {{ form.turno.label }} <span class="text-red-400">*</span>
-          </label>
-          {{ form.turno }}
-          {% if form.turno.errors %}
-          <p class="text-xs text-red-500">{{ form.turno.errors|join:", " }}</p>
-          {% endif %}
-          <p id="turno-hint" class="text-[10px] text-amber-600 hidden">Selecione uma data primeiro para ver os turnos disponíveis.</p>
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-[#50443C]">{{ form.observacoes.label }}</label>
-          {{ form.observacoes }}
-          {% if form.observacoes.errors %}
-          <p class="text-xs text-red-500">{{ form.observacoes.errors|join:", " }}</p>
-          {% endif %}
-        </div>
-
-        <div class="flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Os horários são definidos automaticamente com base no turno selecionado.
-        </div>
-
-        <div class="flex items-center justify-between pt-2">
-          <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard' %}{% endif %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
-            Cancelar
-          </a>
-          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
-            Salvar Plantão
-          </button>
-        </div>
-      </form>
-    </div>
+      </div>
+    </aside>
   </div>
-
-  <!-- Referência de horários -->
-  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
-    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-      <div class="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      </div>
-      <h2 class="text-sm font-bold text-[#50443C]">Horários dos Turnos</h2>
-    </div>
-    <div class="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div>
-        <p class="text-xs font-bold text-[#E94920] uppercase tracking-wider mb-2">Sábado</p>
-        <ul class="space-y-1.5">
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 1:</span> 13:00 – 17:00</li>
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 2:</span> 17:00 – 21:00</li>
-        </ul>
-      </div>
-      <div>
-        <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Domingo</p>
-        <ul class="space-y-1.5">
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Manhã:</span> 08:00 – 13:00</li>
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 1:</span> 13:00 – 17:00</li>
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 2:</span> 17:00 – 21:00</li>
-        </ul>
-      </div>
-      <div>
-        <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Avulso (Seg–Sex)</p>
-        <ul class="space-y-1.5">
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Manhã:</span> 08:00 – 13:00</li>
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 1:</span> 13:00 – 17:00</li>
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Tarde 2:</span> 17:00 – 21:00</li>
-          <li class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Dia todo:</span> 08:00 – 18:00</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-</div>
+</form>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 (function () {
-  var SAB_TURNOS   = ['SABADO_TARDE1', 'SABADO_TARDE2'];
-  var DOM_TURNOS   = ['DOMINGO_MANHA', 'DOMINGO_TARDE1', 'DOMINGO_TARDE2'];
-  var AVULSO_TURNOS = ['AVULSO_MANHA', 'AVULSO_TARDE1', 'AVULSO_TARDE2', 'AVULSO_DIA_TODO'];
-  var DIAS = ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'];
+  var form = document.getElementById('form-plantao');
+  var campoData = form.querySelector('input[name=data]');
+  var cartoesTurno = form.querySelectorAll('#lista-turnos label');
+  var DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  var requisicao = 0;
 
-  var dataInput  = document.getElementById('{{ form.data.id_for_label }}');
-  var turnoSel   = document.getElementById('{{ form.turno.id_for_label }}');
-  var diaInfo    = document.getElementById('dia-info');
-  var turnoHint  = document.getElementById('turno-hint');
+  function dataSelecionada() {
+    if (!campoData.value) return null;
+    var p = campoData.value.split('-');
+    return new Date(+p[0], p[1] - 1, +p[2]);
+  }
+  function marcado(nome) { return form.querySelector('input[name=' + nome + ']:checked'); }
 
-  function filtrarTurnos() {
-    if (!dataInput.value) {
-      // Sem data: mostra tudo
-      for (var i = 0; i < turnoSel.options.length; i++) {
-        turnoSel.options[i].hidden = false;
-      }
-      diaInfo.classList.add('hidden');
-      return;
-    }
+  function atualizarTurnos() {
+    var d = dataSelecionada();
+    var pill = document.getElementById('dia-semana');
+    document.getElementById('turno-vazio').classList.toggle('hidden', !!d);
+    if (!d) { pill.classList.add('hidden'); cartoesTurno.forEach(function (c) { c.classList.add('hidden'); c.classList.remove('flex'); }); return; }
+    var dow = d.getDay();
+    var tipo = dow === 6 ? 'sab' : dow === 0 ? 'dom' : 'util';
+    pill.textContent = DIAS[dow];
+    pill.className = 'px-3 py-1.5 rounded-lg text-xs font-bold ' +
+      (tipo === 'sab' ? 'bg-[#E94920]/10 text-[#E94920]' : tipo === 'dom' ? 'bg-emerald-500/10 text-emerald-700' : 'bg-blue-500/10 text-blue-700');
+    cartoesTurno.forEach(function (c) {
+      var mostra = c.dataset.dia === tipo;
+      c.classList.toggle('hidden', !mostra); c.classList.toggle('flex', mostra);
+      var r = c.querySelector('input');
+      if (!mostra && r.checked) r.checked = false;
+    });
+  }
 
-    var partes = dataInput.value.split('-');
-    var d = new Date(partes[0], partes[1] - 1, partes[2]);
-    var dow = d.getDay(); // 0=Dom … 6=Sáb
-    // JS: 0=Dom,1=Seg,…,6=Sáb  →  Python: 0=Seg,…,5=Sáb,6=Dom
-    var pythonDow = (dow === 0) ? 6 : dow - 1;
+  function atualizarResumo() {
+    var d = dataSelecionada(), t = marcado('turno'), c = marcado('colaborador');
+    document.getElementById('r-data').textContent = d ? DIAS[d.getDay()] + ', ' + d.toLocaleDateString('pt-BR') : '—';
+    document.getElementById('r-turno').textContent = t ? t.dataset.rotulo : '—';
+    document.getElementById('r-colab').textContent = c ? c.dataset.rotulo : '—';
+  }
 
-    diaInfo.textContent = DIAS[pythonDow];
-    diaInfo.classList.remove('hidden');
-    turnoHint.classList.add('hidden');
-
-    var permitidos;
-    if (pythonDow === 5) {        // Sábado
-      permitidos = SAB_TURNOS;
-    } else if (pythonDow === 6) { // Domingo
-      permitidos = DOM_TURNOS;
-    } else {                      // Seg–Sex
-      permitidos = AVULSO_TURNOS;
-    }
-
-    var primeiroVisivel = null;
-    for (var i = 0; i < turnoSel.options.length; i++) {
-      var opt = turnoSel.options[i];
-      if (opt.value === '') { opt.hidden = false; continue; }
-      var visivel = permitidos.indexOf(opt.value) !== -1;
-      opt.hidden = !visivel;
-      if (visivel && !primeiroVisivel) primeiroVisivel = opt.value;
-    }
-
-    // Se o turno atual não está na lista permitida, resetar
-    if (turnoSel.value && permitidos.indexOf(turnoSel.value) === -1) {
-      turnoSel.value = '';
+  function mostrarRegras(violacoes) {
+    var box = document.getElementById('r-regras');
+    if (violacoes === null) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    if (!violacoes.length) {
+      box.className = 'mx-5 mb-4 px-3 py-2.5 rounded-xl text-xs bg-emerald-50 text-emerald-800 border border-emerald-200';
+      box.textContent = '✓ Dentro das regras da escala.';
+    } else {
+      box.className = 'mx-5 mb-4 px-3 py-2.5 rounded-xl text-xs bg-amber-50 text-amber-800 border border-amber-200';
+      box.innerHTML = '<p class="font-bold mb-1">Atenção às regras:</p>';
+      violacoes.forEach(function (v) { var p = document.createElement('p'); p.textContent = '• ' + v; box.appendChild(p); });
+      var aviso = document.createElement('p'); aviso.className = 'mt-1 text-amber-700/80';
+      aviso.textContent = 'Você ainda pode salvar.'; box.appendChild(aviso);
     }
   }
 
-  if (dataInput) {
-    dataInput.addEventListener('change', filtrarTurnos);
-    // Rodar na carga da página (modo edição)
-    if (dataInput.value) filtrarTurnos();
-    else turnoHint.classList.remove('hidden');
+  function checar() {
+    var d = campoData.value;
+    if (!d) { mostrarRegras(null); return; }
+    var t = marcado('turno'), c = marcado('colaborador');
+    var params = new URLSearchParams({ data: d, ignorar: form.dataset.ignorar || '' });
+    if (t && c) { params.set('turno', t.value); params.set('colaborador', c.value); }
+    var id = ++requisicao;
+    fetch(form.dataset.checarUrl + '?' + params, { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (json) {
+        if (!json || id !== requisicao) return;
+        cartoesTurno.forEach(function (cartao) {
+          var nome = json.ocupados[cartao.dataset.turno];
+          var radio = cartao.querySelector('input'), etiqueta = cartao.querySelector('[data-ocupado]');
+          radio.disabled = !!nome;
+          if (nome && radio.checked) radio.checked = false;
+          etiqueta.textContent = nome ? 'Ocupado · ' + nome : '';
+          etiqueta.classList.toggle('hidden', !nome);
+          cartao.querySelector('[data-info]').classList.toggle('hidden', !!nome);
+        });
+        atualizarResumo();
+        mostrarRegras(marcado('turno') && marcado('colaborador') ? json.violacoes : null);
+      })
+      .catch(function () {});
   }
+
+  campoData.addEventListener('change', function () { atualizarTurnos(); atualizarResumo(); checar(); });
+  form.querySelectorAll('[data-data]').forEach(function (b) {
+    b.addEventListener('click', function () { campoData.value = b.dataset.data; campoData.dispatchEvent(new Event('change')); });
+  });
+  form.addEventListener('change', function (e) {
+    if (e.target.name === 'turno' || e.target.name === 'colaborador') { atualizarResumo(); checar(); }
+  });
+  var busca = document.getElementById('busca-colab');
+  if (busca) busca.addEventListener('input', function () {
+    var q = busca.value.trim().toLowerCase();
+    form.querySelectorAll('[data-nome]').forEach(function (l) { l.classList.toggle('hidden', q && l.dataset.nome.indexOf(q) === -1); });
+  });
+
+  atualizarTurnos(); atualizarResumo(); checar();
 })();
 </script>
 {% endblock %}

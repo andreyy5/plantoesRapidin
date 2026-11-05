@@ -42,6 +42,7 @@
     {% url 'cadastrar_plantao_tecnico' as u %}{% include 'partials/nav_item.html' with url=u chave='tec_novo' label='Novo plantão' icone='calendar' %}
     {% url 'gerar_escala_tecnicos' as u %}{% include 'partials/nav_item.html' with url=u chave='tec_gerar' label='Gerar escala' icone='bolt' %}
     {% url 'gerenciar_tecnicos' as u %}{% include 'partials/nav_item.html' with url=u chave='tec_lista' label='Técnicos' icone='wrench' %}
+    {% url 'relatorios' as u %}{% include 'partials/nav_item.html' with url=u|add:'?area=tecnicos' chave='relatorios' label='Relatórios' icone='chart' %}
     {% endif %}
   {% else %}
     {% url 'dashboard' as u %}
@@ -59,6 +60,7 @@
     {% url 'gerar_escala' as u %}{% include 'partials/nav_item.html' with url=u chave='sac_gerar' label='Gerar escala' icone='bolt' %}
     {% url 'cadastrar_plantao' as u %}{% include 'partials/nav_item.html' with url=u chave='sac_novo' label='Novo plantão' icone='calendar' %}
     {% url 'gerenciar_colaboradores' as u %}{% include 'partials/nav_item.html' with url=u chave='sac_colab' label='Colaboradores' icone='users' %}
+    {% url 'relatorios' as u %}{% include 'partials/nav_item.html' with url=u chave='relatorios' label='Relatórios' icone='chart' %}
     {% endif %}
   {% endif %}
 </nav>

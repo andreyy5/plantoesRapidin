@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% block title %}Relatórios - Rapidin Plantões{% endblock %}
+
+{% block content %}
+
+<!-- Cabeçalho -->
+<div class="flex items-start justify-between flex-wrap gap-3">
+  <div>
+    <h1 class="text-xl font-bold text-[#50443C]">Relatórios</h1>
+    <p class="text-xs text-gray-400 font-medium mt-1">Plantões e horas por pessoa no período, com exportação em PDF</p>
+  </div>
+  <a href="{{ url_pdf }}" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+    {% include 'partials/icon.html' with nome='download' classe='w-4 h-4' %}
+    Baixar PDF
+  </a>
+</div>
+
+<!-- Área -->
+<nav class="grid grid-cols-2 gap-1 p-1 rounded-xl bg-white border border-gray-200/80 w-full sm:w-auto sm:self-start" aria-label="Área do relatório">
+  {% for valor, rotulo in areas %}
+  <a href="?area={{ valor }}&data_inicio={{ f.inicio|date:'Y-m-d' }}&data_fim={{ f.fim|date:'Y-m-d' }}" {% if f.area == valor %}aria-current="page"{% endif %}
+     class="text-center px-4 py-2 rounded-lg text-xs font-bold transition-colors {% if f.area == valor %}bg-[#E94920] text-white shadow-sm{% else %}text-gray-500 hover:text-[#50443C] hover:bg-gray-50{% endif %}">{{ rotulo }}</a>
+  {% endfor %}
+</nav>
+
+<!-- Filtros -->
+<form method="get" class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+  <input type="hidden" name="area" value="{{ f.area }}">
+  <div class="flex items-center gap-1.5 flex-wrap px-4 py-3 border-b border-gray-100">
+    {% for a in atalhos %}
+    <a href="{{ a.url }}" {% if a.ativo %}aria-current="true"{% endif %}
+       class="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors {% if a.ativo %}bg-[#E94920] text-white{% else %}text-gray-500 hover:bg-gray-100 hover:text-[#50443C]{% endif %}">{{ a.rotulo }}</a>
+    {% endfor %}
+  </div>
+  <div class="flex flex-wrap items-end gap-3 px-4 py-4">
+    <div class="flex flex-col gap-1 w-full sm:w-auto sm:min-w-[150px]">
+      <label for="data_inicio" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">De</label>
+      <input type="date" id="data_inicio" name="data_inicio" value="{{ f.inicio|date:'Y-m-d' }}"
+             class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] focus:ring-2 focus:ring-[#E94920]/15 bg-white">
+    </div>
+    <div class="flex flex-col gap-1 w-full sm:w-auto sm:min-w-[150px]">
+      <label for="data_fim" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Até</label>
+      <input type="date" id="data_fim" name="data_fim" value="{{ f.fim|date:'Y-m-d' }}"
+             class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] focus:ring-2 focus:ring-[#E94920]/15 bg-white">
+    </div>
+    <div class="flex flex-col gap-1 w-full sm:w-auto sm:min-w-[220px]">
+      <label for="pessoa" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{{ dados.rotulo_pessoa }}</label>
+      <select id="pessoa" name="pessoa"
+              class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] focus:ring-2 focus:ring-[#E94920]/15 bg-white">
+        <option value="">Todos</option>
+        {% for p in pessoas %}
+        <option value="{{ p.id }}" {% if f.pessoa and f.pessoa.id == p.id %}selected{% endif %}>{{ p.nome_completo }}{% if not p.ativo %} (inativo){% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <label class="flex items-center gap-2 px-1 py-2.5 text-xs font-semibold text-gray-500 cursor-pointer">
+      <input type="hidden" name="detalhado" value="0">
+      <input type="checkbox" name="detalhado" value="1" {% if f.detalhado %}checked{% endif %} class="w-4 h-4 accent-[#E94920]">
+      Lista detalhada no PDF
+    </label>
+    <button type="submit" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-[#50443C] text-white hover:bg-[#3d342e] transition-colors">Atualizar</button>
+  </div>
+</form>
+
+{% if f.limitado %}
+<div class="flex items-center gap-2 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+  {% include 'partials/icon.html' with nome='alert' classe='w-4 h-4 shrink-0' %}
+  O período foi limitado a 1 ano: {{ f.inicio|date:"d/m/Y" }} a {{ f.fim|date:"d/m/Y" }}.
+</div>
+{% endif %}
+
+<!-- Indicadores -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+  {% with t=dados.total %}
+  <div class="bg-white rounded-2xl border border-gray-200/80 p-4">
+    <p class="text-2xl font-extrabold text-[#50443C] leading-none">{{ dados.quantidade }}</p>
+    <p class="text-xs text-gray-400 font-medium mt-1">Plantões</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-200/80 p-4">
+    <p class="text-2xl font-extrabold text-[#E94920] leading-none">{{ t.horas_fmt }}</p>
+    <p class="text-xs text-gray-400 font-medium mt-1">Horas de plantão</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-200/80 p-4">
+    <p class="text-2xl font-extrabold text-[#50443C] leading-none">{{ t.fins_de_semana }}</p>
+    <p class="text-xs text-gray-400 font-medium mt-1">Fins de semana</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-200/80 p-4">
+    <p class="text-2xl font-extrabold text-[#50443C] leading-none">{{ dados.resumo|length }}</p>
+    <p class="text-xs text-gray-400 font-medium mt-1">Pessoas escaladas</p>
+  </div>
+  {% endwith %}
+</div>
+
+{% if dados.alertas %}
+<section class="bg-amber-50 rounded-2xl border border-amber-200 p-5" aria-labelledby="titulo-alertas">
+  <div class="flex items-center gap-2 mb-2 text-amber-800">
+    {% include 'partials/icon.html' with nome='alert' classe='w-4 h-4 shrink-0' %}
+    <h2 id="titulo-alertas" class="text-sm font-bold">Alertas de regra no período</h2>
+  </div>
+  <ul class="space-y-1 text-xs text-amber-800">
+    {% for a in dados.alertas %}<li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0"></span>{{ a }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if dados.quantidade %}
+<!-- Resumo por pessoa -->
+<section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden" aria-labelledby="titulo-resumo">
+  <div class="px-5 py-4 border-b border-gray-100">
+    <h2 id="titulo-resumo" class="text-sm font-bold text-[#50443C]">Resumo por {{ dados.rotulo_pessoa|lower }}</h2>
+    <p class="text-[11px] text-gray-400">{{ f.inicio|date:"d/m/Y" }} a {{ f.fim|date:"d/m/Y" }}</p>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[640px]">
+      <thead>
+        <tr class="bg-gray-50/60 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          <th class="text-left px-5 py-2.5">{{ dados.rotulo_pessoa }}</th>
+          <th class="text-center px-3 py-2.5">Plantões</th>
+          <th class="text-center px-3 py-2.5">Fins de sem.</th>
+          <th class="text-center px-3 py-2.5">Sáb</th>
+          <th class="text-center px-3 py-2.5">Dom</th>
+          <th class="text-center px-3 py-2.5">Avulsos</th>
+          <th class="text-left px-5 py-2.5 w-[220px]">Horas</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% with maximo=dados.resumo.0.horas %}
+        {% for l in dados.resumo %}
+        <tr class="hover:bg-gray-50/70">
+          <td class="px-5 py-3 text-sm font-semibold text-[#50443C]">{{ l.nome }}</td>
+          <td class="px-3 py-3 text-sm text-center text-gray-600 tabular-nums">{{ l.plantoes }}</td>
+          <td class="px-3 py-3 text-sm text-center text-gray-600 tabular-nums">{{ l.fins_de_semana }}</td>
+          <td class="px-3 py-3 text-sm text-center text-gray-600 tabular-nums">{{ l.sabados }}</td>
+          <td class="px-3 py-3 text-sm text-center text-gray-600 tabular-nums">{{ l.domingos }}</td>
+          <td class="px-3 py-3 text-sm text-center text-gray-600 tabular-nums">{{ l.avulsos }}</td>
+          <td class="px-5 py-3">
+            <div class="flex items-center gap-3">
+              <div class="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden" aria-hidden="true">
+                <div class="h-full rounded-full bg-[#E94920]" style="width: {% widthratio l.horas maximo 100 %}%"></div>
+              </div>
+              <span class="w-12 text-right text-sm font-bold text-[#50443C] tabular-nums">{{ l.horas_fmt }}</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+        {% endwith %}
+      </tbody>
+      <tfoot>
+        {% with t=dados.total %}
+        <tr class="bg-[#E94920]/5 border-t-2 border-[#E94920]/30 text-sm font-bold text-[#50443C]">
+          <td class="px-5 py-3">Total</td>
+          <td class="px-3 py-3 text-center tabular-nums">{{ t.plantoes }}</td>
+          <td class="px-3 py-3 text-center tabular-nums">{{ t.fins_de_semana }}</td>
+          <td class="px-3 py-3 text-center tabular-nums">{{ t.sabados }}</td>
+          <td class="px-3 py-3 text-center tabular-nums">{{ t.domingos }}</td>
+          <td class="px-3 py-3 text-center tabular-nums">{{ t.avulsos }}</td>
+          <td class="px-5 py-3 text-right tabular-nums">{{ t.horas_fmt }}</td>
+        </tr>
+        {% endwith %}
+      </tfoot>
+    </table>
+  </div>
+</section>
+
+<!-- Detalhamento -->
+<section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden" aria-labelledby="titulo-detalhe">
+  <div class="px-5 py-4 border-b border-gray-100">
+    <h2 id="titulo-detalhe" class="text-sm font-bold text-[#50443C]">Plantões do período</h2>
+    <p class="text-[11px] text-gray-400">{{ dados.quantidade }} plant{{ dados.quantidade|pluralize:"ão,ões" }} em {{ dados.semanas|length }} semana{{ dados.semanas|length|pluralize }}</p>
+  </div>
+  <div class="divide-y divide-gray-100">
+    {% for semana in dados.semanas %}
+    <details class="group" {% if forloop.first %}open{% endif %}>
+      <summary class="flex items-center gap-3 px-5 py-3 cursor-pointer list-none hover:bg-gray-50/70 [&::-webkit-details-marker]:hidden">
+        <span class="text-gray-400 transition-transform group-open:rotate-180">{% include 'partials/icon.html' with nome='chevron-down' classe='w-4 h-4' %}</span>
+        <span class="text-sm font-semibold text-[#50443C]">Semana de {{ semana.inicio|date:"d/m" }} a {{ semana.fim|date:"d/m/Y" }}</span>
+        <span class="ml-auto text-[11px] text-gray-400">{{ semana.itens|length }} plant{{ semana.itens|length|pluralize:"ão,ões" }}</span>
+      </summary>
+      <div class="overflow-x-auto px-5 pb-4">
+        <table class="w-full min-w-[560px] text-sm">
+          <thead>
+            <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <th class="text-left py-2 pr-3">Data</th><th class="text-left py-2 pr-3">Horário</th>
+              <th class="text-left py-2 pr-3">Turno</th><th class="text-left py-2 pr-3">{{ dados.rotulo_pessoa }}</th><th class="text-left py-2">Obs.</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {% for i in semana.itens %}
+            <tr>
+              <td class="py-2 pr-3 whitespace-nowrap"><span class="font-semibold text-[#50443C]">{{ i.dia }}</span> <span class="text-gray-500">{{ i.data|date:"d/m" }}</span></td>
+              <td class="py-2 pr-3 text-gray-500 tabular-nums whitespace-nowrap">{{ i.horario }}</td>
+              <td class="py-2 pr-3 text-gray-500">{{ i.tipo }}</td>
+              <td class="py-2 pr-3 font-semibold text-[#50443C]">{{ i.pessoas }}</td>
+              <td class="py-2 text-xs text-gray-400 max-w-[220px] truncate" title="{{ i.obs }}">{{ i.obs|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm px-6 py-14 text-center">
+  <div class="w-14 h-14 rounded-2xl bg-gray-100 text-gray-300 flex items-center justify-center mx-auto mb-4">
+    {% include 'partials/icon.html' with nome='calendar' classe='w-7 h-7' %}
+  </div>
+  <h2 class="text-sm font-bold text-[#50443C] mb-1">Nenhum plantão neste período</h2>
+  <p class="text-xs text-gray-400">Escolha outro período ou outra pessoa nos filtros acima.</p>
+</div>
+{% endif %}
+
+{% endblock %}
