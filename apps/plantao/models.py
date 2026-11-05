@@ -314,27 +314,32 @@ class TecnicoCampo(models.Model):
 class PlantaoTecnico(models.Model):
     """Modelo para Plantões de Técnicos de Campo"""
     
+    # Os valores gravados no banco não mudam (ex.: DOMINGO_SOLO), só os rótulos.
+    # O domingo pode ser solo ou em dupla; o sábado é sempre em dupla.
     TIPO_CHOICES = [
         ('SABADO_DUPLA', 'Sábado - Dupla (14:00-18:00)'),
-        ('DOMINGO_SOLO', 'Domingo - Solo (Dia Todo)'),
+        ('DOMINGO_SOLO', 'Domingo - Solo ou Dupla (Dia Todo)'),
         ('AVULSO_SOLO', 'Dia Avulso - Solo (Dia Todo)'),
     ]
-    
+    TIPOS_COM_DUPLA = ('SABADO_DUPLA', 'DOMINGO_SOLO')
+    TIPOS_DUPLA_OBRIGATORIA = ('SABADO_DUPLA',)
+    _DIA_DO_TIPO = {'SABADO_DUPLA': 'Sábado', 'DOMINGO_SOLO': 'Domingo', 'AVULSO_SOLO': 'Avulso'}
+
     # Técnico principal
     tecnico_principal = models.ForeignKey(
         TecnicoCampo,
         on_delete=models.CASCADE,
         related_name='plantoes_principal'
     )
-    
-    # Técnico dupla (apenas para sábados)
+
+    # Técnico dupla: obrigatório no sábado, opcional no domingo
     tecnico_dupla = models.ForeignKey(
         TecnicoCampo,
         on_delete=models.CASCADE,
         related_name='plantoes_dupla',
         null=True,
         blank=True,
-        help_text="Apenas para plantões de sábado"
+        help_text="Obrigatório no sábado; opcional no domingo"
     )
     
     data = models.DateField()
@@ -356,9 +361,19 @@ class PlantaoTecnico(models.Model):
         unique_together = ['data', 'tipo']  # Não pode ter 2 plantões do mesmo tipo no mesmo dia
     
     def __str__(self):
-        if self.tipo == 'SABADO_DUPLA' and self.tecnico_dupla:
+        if self.tecnico_dupla:
             return f"{self.tecnico_principal.nome_completo} + {self.tecnico_dupla.nome_completo} - {self.data}"
         return f"{self.tecnico_principal.nome_completo} - {self.data}"
+
+    @property
+    def formato(self):
+        """'Dupla' ou 'Solo', conforme o plantão tem ou não dupla."""
+        return 'Dupla' if self.tecnico_dupla_id else 'Solo'
+
+    @property
+    def rotulo(self):
+        """Ex.: 'Domingo · Dupla'."""
+        return f"{self._DIA_DO_TIPO.get(self.tipo, self.tipo)} · {self.formato}"
     
     def save(self, *args, **kwargs):
         # Define horários automaticamente baseado no tipo

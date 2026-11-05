@@ -31,7 +31,7 @@
       </div>
       <div>
         <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">Domingo</p>
-        <p class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Solo</span> – Dia todo<br>1 técnico apenas</p>
+        <p class="text-xs text-gray-500"><span class="font-semibold text-[#50443C]">Solo ou dupla</span> – Dia todo<br>1 técnico, ou 2 se marcar a opção abaixo</p>
       </div>
       <div>
         <p class="text-xs font-bold text-[#E94920] uppercase tracking-wider mb-2">Rotação</p>
@@ -77,6 +77,15 @@
           </div>
         </div>
 
+        <label class="flex items-start gap-3 p-3 rounded-xl border-2 border-gray-200 cursor-pointer transition-colors hover:border-gray-300
+                      has-[:checked]:border-[#E94920] has-[:checked]:bg-[#E94920]/5">
+          <input type="checkbox" name="domingo_dupla" value="1" class="mt-0.5 w-4 h-4 accent-[#E94920]">
+          <span>
+            <span class="block text-sm font-semibold text-[#50443C]">Domingo também em dupla</span>
+            <span class="block text-[11px] text-gray-400">Cada domingo terá 2 técnicos. Dá para mudar depois em cada plantão.</span>
+          </span>
+        </label>
+
         <!-- Exemplo -->
         <div class="px-4 py-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700">
           <p class="font-bold mb-1.5">Exemplo – 3 técnicos, 2 semanas:</p>
@@ -90,7 +99,7 @@
         <div class="flex items-start gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-xs text-red-600">
           <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           <ul class="space-y-0.5">
-            <li>A escala substituirá plantões existentes nas datas selecionadas</li>
+            <li>Se já houver plantões de sábado ou domingo no período, nada é gerado</li>
             <li>É necessário ter pelo menos 2 técnicos ativos</li>
             <li>A rotação segue a ordem da fila configurada</li>
           </ul>

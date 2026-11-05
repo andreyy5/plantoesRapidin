@@ -134,7 +134,7 @@ def dados_tecnicos(inicio, fim, tecnico=None):
         itens.append({
             'data': p.data, 'dia': DIAS[p.data.weekday()],
             'horario': f'{p.hora_inicio:%H:%M}–{p.hora_fim:%H:%M}',
-            'tipo': p.get_tipo_display(),
+            'tipo': p.rotulo,
             'pessoas': ' + '.join(t.nome_completo for t in envolvidos),
             'obs': p.observacoes or '',
         })

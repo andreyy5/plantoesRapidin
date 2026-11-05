@@ -374,3 +374,82 @@ class CadastroTecnicoTests(TestCase):
         resp = self._post(**dados)
         self.assertContains(resp, 'Já existe um plantão desse tipo nessa data')
         self.assertEqual(PlantaoTecnico.objects.count(), 1)
+
+
+class DomingoEmDuplaTests(TestCase):
+    def setUp(self):
+        from .models import TecnicoCampo
+        self.admin = User.objects.create_superuser('admin', 'a@a.com', 'x')
+        self.tecs = [TecnicoCampo.objects.create(nome_completo=f'Téc {i}', ordem_fila=i) for i in range(1, 5)]
+        self.sabado = escala.proximo_sabado(timezone.localdate())
+        self.domingo = self.sabado + timedelta(days=1)
+        self.client.force_login(self.admin)
+
+    def _cadastrar(self, **dados):
+        return self.client.post(reverse('cadastrar_plantao_tecnico'), dados)
+
+    def test_domingo_aceita_dupla_ou_solo(self):
+        from .models import PlantaoTecnico
+        self._cadastrar(tipo='DOMINGO_SOLO', data=self.domingo.isoformat(),
+                        tecnico_principal=self.tecs[0].id, tecnico_dupla=self.tecs[1].id)
+        self._cadastrar(tipo='DOMINGO_SOLO', data=(self.domingo + timedelta(weeks=1)).isoformat(),
+                        tecnico_principal=self.tecs[2].id, tecnico_dupla='')
+        com, sem = PlantaoTecnico.objects.order_by('data')
+        self.assertEqual((com.tecnico_dupla, com.formato, com.rotulo), (self.tecs[1], 'Dupla', 'Domingo · Dupla'))
+        self.assertEqual((sem.tecnico_dupla, sem.formato), (None, 'Solo'))
+
+    def test_dupla_do_domingo_nao_pode_ser_o_principal(self):
+        from .models import PlantaoTecnico
+        resp = self._cadastrar(tipo='DOMINGO_SOLO', data=self.domingo.isoformat(),
+                               tecnico_principal=self.tecs[0].id, tecnico_dupla=self.tecs[0].id)
+        self.assertContains(resp, 'precisa ser outro técnico')
+        self.assertFalse(PlantaoTecnico.objects.exists())
+
+    def test_sabado_continua_exigindo_dupla(self):
+        resp = self._cadastrar(tipo='SABADO_DUPLA', data=self.sabado.isoformat(),
+                               tecnico_principal=self.tecs[0].id, tecnico_dupla='')
+        self.assertContains(resp, 'precisa de uma dupla')
+
+    def test_avulso_ignora_dupla(self):
+        from .models import PlantaoTecnico
+        self._cadastrar(tipo='AVULSO_SOLO', data=(self.sabado + timedelta(days=3)).isoformat(),
+                        tecnico_principal=self.tecs[0].id, tecnico_dupla=self.tecs[1].id)
+        self.assertIsNone(PlantaoTecnico.objects.get().tecnico_dupla)
+
+    def test_editar_domingo_adiciona_e_remove_dupla(self):
+        from .models import PlantaoTecnico
+        p = PlantaoTecnico.objects.create(tecnico_principal=self.tecs[0], data=self.domingo, tipo='DOMINGO_SOLO')
+        url = reverse('editar_plantao_tecnico', args=[p.id])
+        self.client.post(url, {'tecnico_principal': self.tecs[0].id, 'tecnico_dupla': self.tecs[1].id})
+        p.refresh_from_db()
+        self.assertEqual(p.tecnico_dupla, self.tecs[1])
+        self.client.post(url, {'tecnico_principal': self.tecs[0].id, 'tecnico_dupla': ''})
+        p.refresh_from_db()
+        self.assertIsNone(p.tecnico_dupla)
+
+    def test_gerar_escala_com_domingo_em_dupla(self):
+        from .models import PlantaoTecnico
+        resp = self.client.post(reverse('gerar_escala_tecnicos'), {
+            'data_inicio': self.sabado.isoformat(), 'semanas': 3, 'domingo_dupla': '1'})
+        self.assertEqual(resp.status_code, 302)
+        domingos = PlantaoTecnico.objects.filter(tipo='DOMINGO_SOLO')
+        self.assertEqual(domingos.count(), 3)
+        for d in domingos:
+            self.assertIsNotNone(d.tecnico_dupla)
+            self.assertNotEqual(d.tecnico_dupla_id, d.tecnico_principal_id)
+
+    def test_gerar_escala_sem_a_opcao_mantem_domingo_solo(self):
+        from .models import PlantaoTecnico
+        self.client.post(reverse('gerar_escala_tecnicos'), {
+            'data_inicio': self.sabado.isoformat(), 'semanas': 2})
+        self.assertFalse(PlantaoTecnico.objects.filter(tipo='DOMINGO_SOLO', tecnico_dupla__isnull=False).exists())
+
+    def test_relatorio_conta_horas_dos_dois_no_domingo(self):
+        from .models import PlantaoTecnico
+        PlantaoTecnico.objects.create(tecnico_principal=self.tecs[0], tecnico_dupla=self.tecs[1],
+                                      data=self.domingo, tipo='DOMINGO_SOLO')
+        resp = self.client.get(reverse('relatorios'), {
+            'area': 'tecnicos', 'data_inicio': self.domingo.isoformat(), 'data_fim': self.domingo.isoformat()})
+        horas = {l.nome: l.horas for l in resp.context['dados']['resumo']}
+        self.assertEqual(horas, {'Téc 1': 10, 'Téc 2': 10})
+        self.assertEqual(resp.context['dados']['semanas'][0]['itens'][0]['tipo'], 'Domingo · Dupla')

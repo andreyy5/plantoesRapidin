@@ -1246,7 +1246,6 @@ def exportar_pdf_tecnicos(request):
                            textColor=colors.grey, alignment=TA_CENTER),
         ))
     else:
-        TIPO_MAP = {'SABADO_DUPLA': 'Dupla', 'DOMINGO_SOLO': 'Solo', 'AVULSO_SOLO': 'Avulso'}
         DIAS     = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
         # Colunas — portrait A4 (~18 cm útil)
@@ -1283,7 +1282,7 @@ def exportar_pdf_tecnicos(request):
             ]]
 
             for p in sd['plantoes']:
-                tipo = TIPO_MAP.get(p.tipo, p.tipo)
+                tipo = 'Avulso' if p.tipo == 'AVULSO_SOLO' else p.formato
                 dia  = DIAS[p.data.weekday()]
                 obs  = (p.observacoes[:38] + '…') if p.observacoes and len(p.observacoes) > 38 else (p.observacoes or '—')
 
@@ -1336,7 +1335,7 @@ def exportar_pdf_tecnicos(request):
 
 _TIPOS_TECNICO = (
     {'valor': 'SABADO_DUPLA', 'dia': 'Sábado', 'formato': 'Dupla', 'horario': '14:00–18:00', 'weekday': 5},
-    {'valor': 'DOMINGO_SOLO', 'dia': 'Domingo', 'formato': 'Solo', 'horario': '08:00–18:00', 'weekday': 6},
+    {'valor': 'DOMINGO_SOLO', 'dia': 'Domingo', 'formato': 'Solo ou dupla', 'horario': '08:00–18:00', 'weekday': 6},
     {'valor': 'AVULSO_SOLO', 'dia': 'Avulso', 'formato': 'Solo', 'horario': '08:00–18:00', 'weekday': None},
 )
 
@@ -1372,11 +1371,11 @@ def cadastrar_plantao_tecnico(request):
             erros['tecnico_principal'] = 'Escolha o técnico responsável.'
 
         dupla = None
-        if tipo == 'SABADO_DUPLA':
+        if tipo in PlantaoTecnico.TIPOS_COM_DUPLA:
             dupla = ativos.filter(pk=valores['tecnico_dupla']).first() if valores['tecnico_dupla'].isdigit() else None
-            if not dupla:
+            if not dupla and tipo in PlantaoTecnico.TIPOS_DUPLA_OBRIGATORIA:
                 erros['tecnico_dupla'] = 'O plantão de sábado precisa de uma dupla.'
-            elif principal and dupla.pk == principal.pk:
+            elif dupla and principal and dupla.pk == principal.pk:
                 erros['tecnico_dupla'] = 'A dupla precisa ser outro técnico.'
 
         if not erros and PlantaoTecnico.objects.filter(data=data, tipo=tipo).exists():
@@ -1443,7 +1442,9 @@ def gerar_escala_tecnicos(request):
 
         try:
             with transaction.atomic():
-                plantoes_criados = _criar_plantoes_tecnicos(data_inicio, semanas)
+                plantoes_criados = _criar_plantoes_tecnicos(
+                    data_inicio, semanas, domingo_dupla=request.POST.get('domingo_dupla') == '1'
+                )
                 EscalaAutomaticaTecnico.objects.create(
                     criada_por=request.user,
                     data_inicio=data_inicio,
@@ -1464,8 +1465,11 @@ def gerar_escala_tecnicos(request):
     return render(request, 'dashboard/tecnicos/gerar_escala.html', context)
 
 
-def _criar_plantoes_tecnicos(data_inicio, semanas):
-    """Lógica para criar plantões de técnicos automaticamente"""
+def _criar_plantoes_tecnicos(data_inicio, semanas, domingo_dupla=False):
+    """
+    Cria os plantões dos técnicos seguindo a fila: sábado em dupla e domingo
+    solo (ou em dupla, com domingo_dupla=True).
+    """
     
     from .models import PlantaoTecnico, TecnicoCampo
     
@@ -1493,15 +1497,17 @@ def _criar_plantoes_tecnicos(data_inicio, semanas):
         plantoes_criados += 1
         
         tec_domingo = tecnicos[(indice + 2) % len(tecnicos)]
+        dupla_domingo = tecnicos[(indice + 3) % len(tecnicos)] if domingo_dupla else None
         
         PlantaoTecnico.objects.create(
             tecnico_principal=tec_domingo,
+            tecnico_dupla=dupla_domingo,
             data=domingo,
             tipo='DOMINGO_SOLO'
         )
         plantoes_criados += 1
         
-        indice += 3
+        indice += 4 if domingo_dupla else 3
     
     return plantoes_criados
 
@@ -1572,13 +1578,16 @@ def editar_plantao_tecnico(request, plantao_id):
         if not principal:
             messages.error(request, 'Escolha o técnico principal.')
             return redirect('editar_plantao_tecnico', plantao_id=plantao.id)
-        if plantao.tipo == 'SABADO_DUPLA' and (not dupla or dupla == principal):
-            messages.error(request, 'O plantão de sábado precisa de uma dupla diferente do técnico principal.')
+        if plantao.tipo in PlantaoTecnico.TIPOS_DUPLA_OBRIGATORIA and not dupla:
+            messages.error(request, 'O plantão de sábado precisa de uma dupla.')
+            return redirect('editar_plantao_tecnico', plantao_id=plantao.id)
+        if dupla and dupla == principal:
+            messages.error(request, 'A dupla precisa ser outro técnico.')
             return redirect('editar_plantao_tecnico', plantao_id=plantao.id)
 
         plantao.tecnico_principal_id = principal
 
-        if plantao.tipo == 'SABADO_DUPLA':
+        if plantao.tipo in PlantaoTecnico.TIPOS_COM_DUPLA:
             plantao.tecnico_dupla_id = dupla
 
         plantao.observacoes = request.POST.get('observacoes', '')

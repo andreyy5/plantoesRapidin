@@ -51,8 +51,8 @@
       <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tipo</label>
       <select name="tipo" class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-[#50443C] focus:outline-none focus:border-[#E94920] bg-white transition-colors">
         <option value="">Todos</option>
-        <option value="SABADO_DUPLA" {% if request.GET.tipo == 'SABADO_DUPLA' %}selected{% endif %}>Dupla (Sábado)</option>
-        <option value="DOMINGO_SOLO" {% if request.GET.tipo == 'DOMINGO_SOLO' %}selected{% endif %}>Solo (Domingo)</option>
+        <option value="SABADO_DUPLA" {% if request.GET.tipo == 'SABADO_DUPLA' %}selected{% endif %}>Sábado (dupla)</option>
+        <option value="DOMINGO_SOLO" {% if request.GET.tipo == 'DOMINGO_SOLO' %}selected{% endif %}>Domingo</option>
         <option value="AVULSO_SOLO" {% if request.GET.tipo == 'AVULSO_SOLO' %}selected{% endif %}>Avulso</option>
       </select>
     </div>
@@ -120,12 +120,12 @@
               </span>
             </td>
             <td class="py-3 px-4 border-b border-gray-50">
-              {% if plantao.tipo == 'SABADO_DUPLA' %}
-              <span class="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-700">Dupla</span>
-              {% elif plantao.tipo == 'DOMINGO_SOLO' %}
-              <span class="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-700">Solo</span>
-              {% else %}
+              {% if plantao.tipo == 'AVULSO_SOLO' %}
               <span class="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-700">Avulso</span>
+              {% elif plantao.tecnico_dupla_id %}
+              <span class="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-700">Dupla</span>
+              {% else %}
+              <span class="inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-700">Solo</span>
               {% endif %}
             </td>
             <td class="py-3 px-4 text-xs text-gray-500 border-b border-gray-50 whitespace-nowrap">{{ plantao.hora_inicio|time:"H:i" }} – {{ plantao.hora_fim|time:"H:i" }}</td>

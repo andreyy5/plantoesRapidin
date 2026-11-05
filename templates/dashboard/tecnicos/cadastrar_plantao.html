@@ -88,8 +88,16 @@
         {% if erros.tecnico_principal %}<p class="text-xs text-red-500 mt-2">{{ erros.tecnico_principal }}</p>{% endif %}
 
         <div id="bloco-dupla" class="hidden mt-5 pt-5 border-t border-gray-100">
-          <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Dupla do sábado</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Dupla do sábado">
+          <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+            Dupla <span id="dupla-regra" class="normal-case tracking-normal font-semibold"></span>
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Dupla">
+            <label id="opcao-sem-dupla" class="flex items-center gap-3 p-2.5 rounded-xl border-2 border-dashed border-gray-200 cursor-pointer transition-colors hover:border-gray-300
+                          has-[:checked]:border-[#E94920] has-[:checked]:border-solid has-[:checked]:bg-[#E94920]/5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#E94920]/30">
+              <input type="radio" name="tecnico_dupla" value="" class="sr-only" data-rotulo="" {% if not valores.tecnico_dupla %}checked{% endif %}>
+              <span class="w-9 h-9 rounded-full bg-gray-100 text-gray-400 text-sm font-bold flex items-center justify-center shrink-0" aria-hidden="true">–</span>
+              <span class="text-sm font-semibold text-gray-500">Sem dupla (solo)</span>
+            </label>
             {% for t in tecnicos %}{% include 'partials/cartao_pessoa.html' with campo='tecnico_dupla' valor=t.id nome=t.nome_completo selecionado=valores.tecnico_dupla %}{% endfor %}
           </div>
           {% if erros.tecnico_dupla %}<p class="text-xs text-red-500 mt-2">{{ erros.tecnico_dupla }}</p>{% endif %}
@@ -140,6 +148,8 @@
     var tipo = marcado('tipo'), d = null;
     if (campoData.value) { var p = campoData.value.split('-'); d = new Date(+p[0], p[1] - 1, +p[2]); }
     var sabado = tipo && tipo.value === 'SABADO_DUPLA';
+    var domingo = tipo && tipo.value === 'DOMINGO_SOLO';
+    var comDupla = sabado || domingo;
 
     var pill = document.getElementById('dia-semana');
     pill.classList.toggle('hidden', !d);
@@ -152,8 +162,15 @@
     if (errado) aviso.textContent = 'Atenção: este tipo de plantão é de ' + DIAS[esperado].toLowerCase() + ', mas a data escolhida é ' + DIAS[d.getDay()].toLowerCase() + '.';
 
     var bloco = document.getElementById('bloco-dupla');
-    if (bloco) bloco.classList.toggle('hidden', !sabado);
-    document.getElementById('r-linha-dupla').classList.toggle('hidden', !sabado);
+    if (bloco) {
+      bloco.classList.toggle('hidden', !comDupla);
+      document.getElementById('dupla-regra').textContent = sabado ? '· obrigatória no sábado' : '· opcional no domingo';
+      // No sábado não existe "sem dupla"
+      var semDupla = document.getElementById('opcao-sem-dupla');
+      semDupla.classList.toggle('hidden', sabado);
+      if (sabado && semDupla.querySelector('input').checked) semDupla.querySelector('input').checked = false;
+    }
+    document.getElementById('r-linha-dupla').classList.toggle('hidden', !comDupla);
 
     // A dupla não pode ser o mesmo técnico responsável
     var principal = marcado('tecnico_principal');
@@ -164,10 +181,12 @@
     });
 
     var dupla = marcado('tecnico_dupla');
-    texto('r-tipo', tipo && tipo.dataset.rotulo);
+    texto('r-tipo', tipo && (domingo
+      ? 'Domingo · ' + (dupla && dupla.value ? 'Dupla' : 'Solo') + ' (08:00–18:00)'
+      : tipo.dataset.rotulo));
     texto('r-data', d && (DIAS[d.getDay()] + ', ' + d.toLocaleDateString('pt-BR')));
     texto('r-principal', principal && principal.dataset.rotulo);
-    texto('r-dupla', dupla && dupla.dataset.rotulo);
+    texto('r-dupla', dupla ? (dupla.value ? dupla.dataset.rotulo : 'Sem dupla') : null);
   }
 
   form.addEventListener('change', atualizar);

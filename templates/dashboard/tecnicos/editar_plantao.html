@@ -9,7 +9,7 @@
   <div class="flex items-start justify-between gap-3 flex-wrap">
     <div>
       <h1 class="text-xl font-bold text-[#50443C]">Editar plantão de técnico</h1>
-      <p class="text-xs text-gray-400 font-medium mt-1">{{ plantao.dia_semana }}, {{ plantao.data|date:"d/m/Y" }} · {{ plantao.get_tipo_display }}</p>
+      <p class="text-xs text-gray-400 font-medium mt-1">{{ plantao.dia_semana }}, {{ plantao.data|date:"d/m/Y" }} · {{ plantao.rotulo }}</p>
     </div>
     <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard_tecnicos' %}{% endif %}"
        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-600 hover:border-gray-300 transition-colors">
@@ -28,7 +28,7 @@
         </div>
         <div class="min-w-0">
           <p class="text-base font-bold text-[#50443C]">{{ plantao.dia_semana }}, {{ plantao.data|date:"d/m/Y" }}</p>
-          <p class="text-xs text-gray-400">{{ plantao.get_tipo_display }} · {{ plantao.hora_inicio|time:"H:i" }}–{{ plantao.hora_fim|time:"H:i" }}</p>
+          <p class="text-xs text-gray-400">{{ plantao.rotulo }} · {{ plantao.hora_inicio|time:"H:i" }}–{{ plantao.hora_fim|time:"H:i" }}</p>
         </div>
         <p class="w-full sm:w-auto sm:ml-auto text-[11px] text-gray-400 max-w-xs">Data e tipo não mudam aqui. Para trocar, exclua e cadastre um novo plantão.</p>
       </section>
@@ -40,10 +40,20 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Técnico responsável">
           {% for t in tecnicos %}{% include 'partials/cartao_pessoa.html' with campo='tecnico_principal' valor=t.id nome=t.nome_completo selecionado=plantao.tecnico_principal_id %}{% endfor %}
         </div>
-        {% if plantao.tipo == 'SABADO_DUPLA' %}
+        {% if plantao.tipo == 'SABADO_DUPLA' or plantao.tipo == 'DOMINGO_SOLO' %}
         <div class="mt-5 pt-5 border-t border-gray-100">
-          <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Dupla do sábado</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Dupla do sábado">
+          <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+            Dupla <span class="normal-case tracking-normal font-semibold">{% if plantao.tipo == 'SABADO_DUPLA' %}· obrigatória no sábado{% else %}· opcional no domingo{% endif %}</span>
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Dupla">
+            {% if plantao.tipo == 'DOMINGO_SOLO' %}
+            <label class="flex items-center gap-3 p-2.5 rounded-xl border-2 border-dashed border-gray-200 cursor-pointer transition-colors hover:border-gray-300
+                          has-[:checked]:border-[#E94920] has-[:checked]:border-solid has-[:checked]:bg-[#E94920]/5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#E94920]/30">
+              <input type="radio" name="tecnico_dupla" value="" class="sr-only" data-rotulo="" {% if not plantao.tecnico_dupla_id %}checked{% endif %}>
+              <span class="w-9 h-9 rounded-full bg-gray-100 text-gray-400 text-sm font-bold flex items-center justify-center shrink-0" aria-hidden="true">–</span>
+              <span class="text-sm font-semibold text-gray-500">Sem dupla (solo)</span>
+            </label>
+            {% endif %}
             {% for t in tecnicos %}{% include 'partials/cartao_pessoa.html' with campo='tecnico_dupla' valor=t.id nome=t.nome_completo selecionado=plantao.tecnico_dupla_id %}{% endfor %}
           </div>
         </div>
@@ -63,7 +73,7 @@
       <div class="px-5 py-4 border-b border-gray-100"><h2 class="text-sm font-bold text-[#50443C]">Resumo</h2></div>
       <dl class="px-5 py-4 flex flex-col gap-3 text-sm">
         <div class="flex justify-between gap-3"><dt class="text-gray-400">Técnico</dt><dd id="r-principal" class="font-semibold text-right text-[#50443C] truncate">—</dd></div>
-        {% if plantao.tipo == 'SABADO_DUPLA' %}
+        {% if plantao.tipo == 'SABADO_DUPLA' or plantao.tipo == 'DOMINGO_SOLO' %}
         <div class="flex justify-between gap-3"><dt class="text-gray-400">Dupla</dt><dd id="r-dupla" class="font-semibold text-right text-[#50443C] truncate">—</dd></div>
         {% endif %}
       </dl>
@@ -93,7 +103,7 @@
     });
     var dupla = marcado('tecnico_dupla');
     document.getElementById('r-principal').textContent = principal ? principal.dataset.rotulo : '—';
-    var rd = document.getElementById('r-dupla'); if (rd) rd.textContent = dupla ? dupla.dataset.rotulo : '—';
+    var rd = document.getElementById('r-dupla'); if (rd) rd.textContent = dupla ? (dupla.value ? dupla.dataset.rotulo : 'Sem dupla') : '—';
   }
   form.addEventListener('change', atualizar);
   atualizar();
