@@ -2,13 +2,13 @@
 {% block title %}Gerar Escala Automática - Rapidin Plantões{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto flex flex-col gap-4">
+<div class="max-w-3xl mx-auto w-full flex flex-col gap-4">
 
   <!-- Cabeçalho -->
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-lg font-bold text-[#50443C]">Gerar Escala Automática</h1>
-      <p class="text-xs text-gray-400 font-medium mt-0.5">Configure o período e gere os plantões automaticamente</p>
+      <p class="text-xs text-gray-400 font-medium mt-0.5">Monte a escala, confira a pré-visualização e só então salve</p>
     </div>
     <a href="{% url 'dashboard' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -24,16 +24,34 @@
       </div>
       <h2 class="text-sm font-bold text-[#50443C]">Como funciona?</h2>
     </div>
-    <div class="p-5">
-      <p class="text-xs text-gray-500 mb-3">A escala automática segue as seguintes regras por semana:</p>
-      <ul class="space-y-2 text-xs">
-        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-[#E94920]/10 text-[#E94920] font-bold text-[10px]">Sáb 13-17</span><span class="text-gray-500">Colaborador A (da fila)</span></li>
-        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-[#E94920]/10 text-[#E94920] font-bold text-[10px]">Sáb 17-21</span><span class="text-gray-500">Colaborador B (próximo na fila)</span></li>
-        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 font-bold text-[10px]">Dom 08-13</span><span class="text-gray-500">Colaborador B (mesmo do sábado à noite)</span></li>
-        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 font-bold text-[10px]">Dom 13-17</span><span class="text-gray-500">Colaborador A (mesmo do sábado à tarde)</span></li>
-        <li class="flex items-center gap-2"><span class="inline-flex px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 font-bold text-[10px]">Dom 17-21</span><span class="text-gray-500">Colaborador C (próximo na fila)</span></li>
-      </ul>
-      <p class="text-[10px] text-gray-400 mt-3">Na próxima semana, a fila avança 2 posições e o processo se repete.</p>
+    <div class="p-5 grid gap-5 sm:grid-cols-2">
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Cada fim de semana tem 3 atendentes</p>
+        <ul class="space-y-2 text-xs">
+          <li class="flex items-start gap-2">
+            <span class="inline-flex w-5 h-5 rounded-md bg-[#E94920]/10 text-[#E94920] font-bold text-[10px] items-center justify-center shrink-0">1</span>
+            <span class="text-gray-500"><strong class="text-[#50443C]">Sáb 13–17</strong> e <strong class="text-[#50443C]">Dom 13–17</strong> <span class="text-gray-400">(abre a semana)</span></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="inline-flex w-5 h-5 rounded-md bg-[#E94920]/10 text-[#E94920] font-bold text-[10px] items-center justify-center shrink-0">2</span>
+            <span class="text-gray-500"><strong class="text-[#50443C]">Sáb 17–21</strong> e <strong class="text-[#50443C]">Dom 08–13</strong></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="inline-flex w-5 h-5 rounded-md bg-[#E94920]/10 text-[#E94920] font-bold text-[10px] items-center justify-center shrink-0">3</span>
+            <span class="text-gray-500"><strong class="text-[#50443C]">Dom 17–21</strong> <span class="text-gray-400">(fecha o domingo)</span></span>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Regras</p>
+        <ul class="space-y-2 text-xs text-gray-500">
+          <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span><span>Quem fecha o domingo <strong class="text-[#50443C]">não abre</strong> a semana seguinte.</span></li>
+          <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span><span>Ninguém trabalha mais que <strong class="text-[#50443C]">{{ max_dias_seguidos }} dias seguidos</strong>. Como sábado é expediente normal, isso quer dizer: <strong class="text-[#50443C]">ninguém pega plantão em dois domingos seguidos</strong>.</span></li>
+          <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span><span>Por isso são necessários pelo menos <strong class="text-[#50443C]">{{ min_colaboradores }} atendentes ativos</strong> (dois grupos de 3 que se revezam).</span></li>
+          <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span><span>Os plantões de cada atendente ficam o <strong class="text-[#50443C]">mais afastados</strong> possível: quem trabalhou nos últimos fins de semana descansa primeiro.</span></li>
+          <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span><span>As horas são equilibradas e, no empate, vale a ordem da fila.</span></li>
+        </ul>
+      </div>
     </div>
   </div>
 
@@ -49,101 +67,147 @@
       <form method="post" class="flex flex-col gap-4">
         {% csrf_token %}
 
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-[#50443C]">
-            {{ form.data_inicio.label }} <span class="text-red-400">*</span>
-          </label>
-          {{ form.data_inicio }}
-          {% if form.data_inicio.errors %}
-          <p class="text-xs text-red-500">{{ form.data_inicio.errors|join:", " }}</p>
-          {% endif %}
-          <p class="text-[10px] text-amber-600 flex items-center gap-1">
-            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            A data deve ser um <strong class="ml-0.5">sábado</strong>
-          </p>
+        {% if colaboradores_ativos < min_colaboradores and not form.non_field_errors %}
+        <div class="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-xs text-red-700">
+          <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>
+            Hoje há <strong>{{ colaboradores_ativos }}</strong> colaborador{{ colaboradores_ativos|pluralize:"es" }} ativo{{ colaboradores_ativos|pluralize }}.
+            Para cumprir as regras são necessários pelo menos <strong>{{ min_colaboradores }}</strong>.
+            <a href="{% url 'gerenciar_colaboradores' %}" class="underline font-bold ml-1">Gerenciar Colaboradores</a>
+          </span>
         </div>
+        {% endif %}
 
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-[#50443C]">
-            {{ form.semanas_gerar.label }} <span class="text-red-400">*</span>
-          </label>
-          {{ form.semanas_gerar }}
-          {% if form.semanas_gerar.errors %}
-          <p class="text-xs text-red-500">{{ form.semanas_gerar.errors|join:", " }}</p>
-          {% endif %}
-          <p class="text-[10px] text-gray-400">Quantidade de semanas a gerar (1 a 12)</p>
+        {% if form.non_field_errors %}
+        <div class="flex items-start gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-xs text-red-700">
+          <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <div>{% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}</div>
+        </div>
+        {% endif %}
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-[#50443C]">
+              {{ form.data_inicio.label }} <span class="text-red-400">*</span>
+            </label>
+            {{ form.data_inicio }}
+            {% if form.data_inicio.errors %}
+            <p class="text-xs text-red-500">{{ form.data_inicio.errors|join:", " }}</p>
+            {% endif %}
+            <p class="text-[10px] text-gray-400">Sugestão: o sábado seguinte ao último fim de semana já escalado.</p>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-[#50443C]">
+              {{ form.semanas_gerar.label }} <span class="text-red-400">*</span>
+            </label>
+            {{ form.semanas_gerar }}
+            {% if form.semanas_gerar.errors %}
+            <p class="text-xs text-red-500">{{ form.semanas_gerar.errors|join:", " }}</p>
+            {% endif %}
+            <p class="text-[10px] text-gray-400">De 1 a 12 semanas</p>
+          </div>
         </div>
 
         <div class="flex items-start gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-700">
           <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-          Certifique-se de que os colaboradores estão cadastrados e na ordem correta da fila antes de gerar a escala.
-          <a href="{% url 'gerenciar_colaboradores' %}" class="underline font-bold ml-1">Gerenciar Colaboradores</a>
+          <span>
+            A escala considera os plantões já cadastrados antes da data de início e usa apenas colaboradores <strong>ativos</strong>.
+            <a href="{% url 'gerenciar_colaboradores' %}" class="underline font-bold ml-1">Gerenciar Colaboradores</a>
+          </span>
         </div>
 
         <div class="flex items-center justify-between pt-2">
           <a href="{% url 'dashboard' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
             Cancelar
           </a>
-          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
-            Gerar Escala
+          <button type="submit" name="acao" value="visualizar" class="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            {% if proposta %}Atualizar pré-visualização{% else %}Pré-visualizar escala{% endif %}
           </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Exemplo de escala -->
-  <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
-    <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-      <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+  {% if proposta %}
+  <!-- Pré-visualização -->
+  <div id="previa" class="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h2 class="text-sm font-bold text-[#50443C]">Pré-visualização</h2>
+          <p class="text-[10px] text-gray-400">{{ proposta.data_inicio|date:"d/m/Y" }} a {{ proposta.data_fim|date:"d/m/Y" }} · nada foi salvo ainda</p>
+        </div>
       </div>
-      <h2 class="text-sm font-bold text-[#50443C]">Exemplo de Escala</h2>
+      <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/10 text-emerald-700">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+        Todas as regras respeitadas
+      </span>
     </div>
-    <div class="p-5">
-      <p class="text-xs text-gray-400 mb-3">Exemplo com 5 colaboradores: Andrey, Jose Neto, Karlos, Maria Eduarda, Angela</p>
-      <div class="overflow-x-auto">
-        <table class="w-full text-xs">
+
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="bg-gray-50/50">
+            <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Fim de semana</th>
+            <th class="text-[10px] font-bold text-[#E94920] uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Sáb 13–17 + Dom 13–17</th>
+            <th class="text-[10px] font-bold text-[#E94920] uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Sáb 17–21 + Dom 08–13</th>
+            <th class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest text-left px-4 py-2.5 border-b border-gray-100">Dom 17–21</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in proposta.linhas %}
+          <tr class="hover:bg-gray-50/70 transition-colors">
+            <td class="py-3 px-4 text-xs font-semibold text-[#50443C] border-b border-gray-50 whitespace-nowrap">{{ linha.sabado|date:"d/m" }} – {{ linha.domingo|date:"d/m/Y" }}</td>
+            <td class="py-3 px-4 text-sm font-semibold text-[#50443C] border-b border-gray-50">{{ linha.A.nome_completo }}</td>
+            <td class="py-3 px-4 text-sm font-semibold text-[#50443C] border-b border-gray-50">{{ linha.B.nome_completo }}</td>
+            <td class="py-3 px-4 text-sm font-semibold text-[#50443C] border-b border-gray-50">{{ linha.C.nome_completo }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="px-5 pt-5 pb-2">
+      <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Resumo por atendente (neste período)</p>
+      <div class="overflow-x-auto rounded-xl border border-gray-100">
+        <table class="w-full">
           <thead>
-            <tr class="bg-gray-50">
-              <th class="text-[10px] font-bold text-gray-400 uppercase px-3 py-2 text-left border-b border-gray-100">Semana</th>
-              <th class="text-[10px] font-bold text-[#E94920] uppercase px-3 py-2 text-left border-b border-gray-100">Sáb 13-17</th>
-              <th class="text-[10px] font-bold text-[#E94920] uppercase px-3 py-2 text-left border-b border-gray-100">Sáb 17-21</th>
-              <th class="text-[10px] font-bold text-emerald-600 uppercase px-3 py-2 text-left border-b border-gray-100">Dom 08-13</th>
-              <th class="text-[10px] font-bold text-emerald-600 uppercase px-3 py-2 text-left border-b border-gray-100">Dom 13-17</th>
-              <th class="text-[10px] font-bold text-emerald-600 uppercase px-3 py-2 text-left border-b border-gray-100">Dom 17-21</th>
+            <tr class="bg-gray-50/50">
+              <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left px-4 py-2 border-b border-gray-100">Atendente</th>
+              <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center px-4 py-2 border-b border-gray-100">Fins de semana</th>
+              <th class="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center px-4 py-2 border-b border-gray-100">Horas</th>
             </tr>
           </thead>
           <tbody>
-            <tr class="hover:bg-gray-50/70">
-              <td class="px-3 py-2 font-bold text-[#E94920] border-b border-gray-50">1</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Andrey</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Jose Neto</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Jose Neto</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Andrey</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Karlos</td>
+            {% for item in proposta.resumo %}
+            <tr>
+              <td class="py-2 px-4 text-xs font-semibold text-[#50443C] border-b border-gray-50">{{ item.colaborador.nome_completo }}</td>
+              <td class="py-2 px-4 text-xs text-center text-gray-500 border-b border-gray-50">{{ item.fins_de_semana }}</td>
+              <td class="py-2 px-4 text-xs text-center text-gray-500 border-b border-gray-50">{{ item.horas|floatformat:0 }}h</td>
             </tr>
-            <tr class="hover:bg-gray-50/70">
-              <td class="px-3 py-2 font-bold text-[#E94920] border-b border-gray-50">2</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Karlos</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Maria E.</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Maria E.</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Karlos</td>
-              <td class="px-3 py-2 text-[#50443C] border-b border-gray-50">Angela</td>
-            </tr>
-            <tr class="hover:bg-gray-50/70">
-              <td class="px-3 py-2 font-bold text-[#E94920]">3</td>
-              <td class="px-3 py-2 text-[#50443C]">Angela</td>
-              <td class="px-3 py-2 text-[#50443C]">Andrey</td>
-              <td class="px-3 py-2 text-[#50443C]">Andrey</td>
-              <td class="px-3 py-2 text-[#50443C]">Angela</td>
-              <td class="px-3 py-2 text-[#50443C]">Jose Neto</td>
-            </tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
+
+    <form method="post" class="flex items-center justify-between gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50 flex-wrap">
+      {% csrf_token %}
+      <input type="hidden" name="data_inicio" value="{{ proposta.data_inicio|date:'Y-m-d' }}">
+      <input type="hidden" name="semanas_gerar" value="{{ proposta.semanas }}">
+      <p class="text-xs text-gray-500">Serão criados <strong class="text-[#50443C]">{{ proposta.registros|length }} plantões</strong>.</p>
+      <button type="submit" name="acao" value="confirmar" class="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Confirmar e salvar escala
+      </button>
+    </form>
   </div>
+  {% endif %}
 
 </div>
 {% endblock %}

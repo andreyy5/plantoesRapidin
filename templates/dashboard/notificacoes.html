@@ -60,16 +60,20 @@
       <p class="text-xs {% if not notif.lida %}text-gray-600{% else %}text-gray-400{% endif %} mb-2">{{ notif.mensagem }}</p>
       <div class="flex flex-wrap gap-2">
         {% if notif.tipo == 'TROCA_SOLICITADA' and notif.troca and notif.troca.status == 'PENDENTE' %}
-        <a href="{% url 'responder_troca' notif.troca.id 'aceitar' %}"
-           onclick="return confirm('Confirma aceitar a troca?')"
-           class="px-3 py-1 rounded-lg text-[11px] font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
-          Aceitar
-        </a>
-        <a href="{% url 'responder_troca' notif.troca.id 'recusar' %}"
-           onclick="return confirm('Confirma recusar a troca?')"
-           class="px-3 py-1 rounded-lg text-[11px] font-bold bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
-          Recusar
-        </a>
+        <form method="post" action="{% url 'responder_troca' notif.troca.id 'aceitar' %}"
+              onsubmit="return confirm('Confirma aceitar a troca?')">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1 rounded-lg text-[11px] font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">
+            Aceitar
+          </button>
+        </form>
+        <form method="post" action="{% url 'responder_troca' notif.troca.id 'recusar' %}"
+              onsubmit="return confirm('Confirma recusar a troca?')">
+          {% csrf_token %}
+          <button type="submit" class="px-3 py-1 rounded-lg text-[11px] font-bold bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+            Recusar
+          </button>
+        </form>
         {% endif %}
         {% if not notif.lida %}
         <a href="{% url 'marcar_notificacao_lida' notif.id %}"

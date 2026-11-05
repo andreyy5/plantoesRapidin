@@ -10,7 +10,7 @@
       <h1 class="text-lg font-bold text-[#50443C]">{{ titulo }}</h1>
       <p class="text-xs text-gray-400 font-medium mt-0.5">Preencha os dados do plantão</p>
     </div>
-    <a href="{% url 'dashboard' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+    <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard' %}{% endif %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
       Voltar
     </a>
@@ -27,6 +27,12 @@
     <div class="p-5">
       <form method="post" class="flex flex-col gap-4">
         {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-xs text-red-700">
+          {% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}
+        </div>
+        {% endif %}
 
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold text-[#50443C]">
@@ -74,7 +80,7 @@
         </div>
 
         <div class="flex items-center justify-between pt-2">
-          <a href="{% url 'dashboard' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+          <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard' %}{% endif %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
             Cancelar
           </a>
           <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30">

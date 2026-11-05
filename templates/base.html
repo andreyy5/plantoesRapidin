@@ -4,218 +4,146 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e1b18">
   <title>{% block title %}Rapidin Plantões{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{% static 'assets/favicon.png' %}">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Poppins','sans-serif']}}}}</script>
+  <style>
+    :focus-visible { outline: 2px solid #E94920; outline-offset: 2px; }
+    [data-carregando] { pointer-events: none; opacity: .7; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+    .toast { animation: toast-in .25s ease-out; }
+    @media (prefers-reduced-motion: reduce) { .toast { animation: none; } * { transition: none !important; } }
+  </style>
   {% block extra_css %}{% endblock %}
 </head>
-<body class="font-sans bg-gray-100 min-h-screen">
+<body class="font-sans bg-gray-100 min-h-screen text-[#50443C]">
+<a href="#conteudo" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:px-4 focus:py-2 focus:rounded-xl focus:bg-white focus:text-sm focus:font-bold focus:shadow-lg">Pular para o conteúdo</a>
+
 <div class="flex min-h-screen">
 
-  <!-- Sidebar Desktop -->
-  <aside class="hidden lg:flex flex-col w-56 bg-[#1e1b18] fixed inset-y-0 left-0 z-30">
-    <div class="flex items-center justify-center h-14 border-b border-white/10 px-4 shrink-0">
-      <img src="{% static 'assets/logoRapidin.png' %}" class="h-7" alt="Rapidin">
-    </div>
-    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      <div class="px-3 pb-3 mb-2 border-b border-white/10">
-        <p class="text-xs font-semibold text-white truncate">{{ user.get_full_name|default:user.username }}</p>
-        <p class="text-[10px] text-gray-500 truncate mt-0.5">{{ user.email }}</p>
-      </div>
-
-      {% if is_admin %}
-      <div class="flex gap-1 mb-2">
-        <a href="{% url 'dashboard' %}"
-           class="flex-1 text-center px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all
-                  {% if 'tecnicos' not in request.path %}bg-[#E94920] text-white{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          SAC
-        </a>
-        <a href="{% url 'dashboard_tecnicos' %}"
-           class="flex-1 text-center px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all
-                  {% if 'tecnicos' in request.path %}bg-[#E94920] text-white{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          Técnicos
-        </a>
-      </div>
-      {% endif %}
-
-      {% if 'tecnicos' in request.path %}
-        <a href="{% url 'dashboard_tecnicos' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if request.resolver_match.url_name == 'dashboard_tecnicos' %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
-          Dashboard
-        </a>
-        {% if is_admin %}
-        <a href="{% url 'cadastrar_plantao_tecnico' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if 'cadastrar_plantao_tecnico' in request.resolver_match.url_name or 'editar_plantao_tecnico' in request.resolver_match.url_name %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          Novo Plantão
-        </a>
-        <a href="{% url 'gerar_escala_tecnicos' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if 'gerar_escala_tecnicos' in request.resolver_match.url_name %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          Gerar Escala
-        </a>
-        <a href="{% url 'gerenciar_tecnicos' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if 'gerenciar_tecnicos' in request.resolver_match.url_name or 'cadastrar_tecnico' in request.resolver_match.url_name or 'editar_tecnico' in request.resolver_match.url_name %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          Técnicos
-        </a>
-        {% endif %}
-      {% else %}
-        <a href="{% url 'dashboard' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if request.resolver_match.url_name == 'dashboard' %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
-          Dashboard SAC
-        </a>
-        {% if is_colaborador and not is_admin %}
-        <a href="{% url 'notificacoes' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative
-                  {% if 'notificacoes' in request.resolver_match.url_name %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-          Notificações
-          {% if notificacoes_nao_lidas > 0 %}
-          <span class="absolute right-3 top-2.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{{ notificacoes_nao_lidas }}</span>
-          {% endif %}
-        </a>
-        <a href="{% url 'minhas_trocas' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if 'minhas_trocas' in request.resolver_match.url_name %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-          Trocas
-        </a>
-        {% endif %}
-        {% if is_admin %}
-        <a href="{% url 'cadastrar_plantao' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if 'cadastrar_plantao' in request.resolver_match.url_name or 'editar_plantao' in request.resolver_match.url_name %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          Novo Plantão
-        </a>
-        <a href="{% url 'gerar_escala' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if 'gerar_escala' in request.resolver_match.url_name %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          Gerar Escala
-        </a>
-        <a href="{% url 'gerenciar_colaboradores' %}"
-           class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
-                  {% if 'colaborador' in request.resolver_match.url_name %}bg-[#E94920] text-white shadow-lg shadow-[#E94920]/25{% else %}text-gray-400 hover:text-white hover:bg-white/5{% endif %}">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          Colaboradores
-        </a>
-        {% endif %}
-      {% endif %}
-    </nav>
-    <div class="border-t border-white/10 px-3 py-3 shrink-0">
-      <form method="post" action="{% url 'logout' %}">
-        {% csrf_token %}
-        <button type="submit" class="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-          Sair
-        </button>
-      </form>
-    </div>
+  <!-- Menu lateral (desktop) -->
+  <aside class="hidden lg:flex flex-col w-60 bg-[#1e1b18] fixed inset-y-0 left-0 z-30">
+    {% include 'partials/sidebar.html' %}
   </aside>
 
-  <!-- Mobile Header -->
-  <div class="lg:hidden fixed top-0 inset-x-0 z-30 bg-[#1e1b18] h-12 flex items-center px-4 gap-3">
-    <button id="open-sidebar-btn" class="text-white/80">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+  <!-- Topo (celular) -->
+  <header class="lg:hidden fixed top-0 inset-x-0 z-30 bg-[#1e1b18] h-14 flex items-center px-3 gap-2 shadow-md">
+    <button type="button" data-abrir-menu class="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/5" aria-label="Abrir menu" aria-controls="menu-celular" aria-expanded="false">
+      {% include 'partials/icon.html' with nome='menu' classe='w-5 h-5' %}
     </button>
-    <img src="{% static 'assets/logoRapidin.png' %}" class="h-6" alt="Rapidin">
-  </div>
+    <img src="{% static 'assets/logoRapidin-horizontal.png' %}" class="h-6 w-auto" alt="Rapidin">
+    {% if is_colaborador and notificacoes_nao_lidas %}
+    <a href="{% url 'notificacoes' %}" class="ml-auto relative p-2 rounded-lg text-white/80 hover:text-white" aria-label="{{ notificacoes_nao_lidas }} notificações não lidas">
+      {% include 'partials/icon.html' with nome='bell' classe='w-5 h-5' %}
+      <span class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{{ notificacoes_nao_lidas }}</span>
+    </a>
+    {% endif %}
+  </header>
 
-  <!-- Mobile Overlay -->
-  <div id="sidebar-overlay" class="hidden fixed inset-0 z-40 bg-black/60 lg:hidden"></div>
-
-  <!-- Mobile Sidebar -->
-  <aside id="mobile-sidebar" class="hidden fixed inset-y-0 left-0 z-50 w-64 bg-[#1e1b18] transform -translate-x-full transition-transform duration-300 lg:hidden">
-    <div class="flex items-center justify-between h-12 border-b border-white/10 px-4">
-      <img src="{% static 'assets/logoRapidin.png' %}" class="h-6" alt="Rapidin">
-      <button id="close-sidebar-btn" class="text-gray-500 hover:text-white">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <nav class="px-3 py-4 space-y-1">
-      {% if is_admin %}
-      <div class="flex gap-1 mb-2">
-        <a href="{% url 'dashboard' %}" class="flex-1 text-center px-2 py-1.5 rounded-lg text-[11px] font-bold {% if 'tecnicos' not in request.path %}bg-[#E94920] text-white{% else %}text-gray-400{% endif %}">SAC</a>
-        <a href="{% url 'dashboard_tecnicos' %}" class="flex-1 text-center px-2 py-1.5 rounded-lg text-[11px] font-bold {% if 'tecnicos' in request.path %}bg-[#E94920] text-white{% else %}text-gray-400{% endif %}">Técnicos</a>
-      </div>
-      {% endif %}
-      {% if 'tecnicos' in request.path %}
-        <a href="{% url 'dashboard_tecnicos' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium {% if request.resolver_match.url_name == 'dashboard_tecnicos' %}bg-[#E94920] text-white{% else %}text-gray-400{% endif %}">Dashboard</a>
-        {% if is_admin %}
-        <a href="{% url 'cadastrar_plantao_tecnico' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Novo Plantão</a>
-        <a href="{% url 'gerar_escala_tecnicos' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Gerar Escala</a>
-        <a href="{% url 'gerenciar_tecnicos' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Técnicos</a>
-        {% endif %}
-      {% else %}
-        <a href="{% url 'dashboard' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium {% if request.resolver_match.url_name == 'dashboard' %}bg-[#E94920] text-white{% else %}text-gray-400{% endif %}">Dashboard SAC</a>
-        {% if is_colaborador and not is_admin %}
-        <a href="{% url 'notificacoes' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Notificações</a>
-        <a href="{% url 'minhas_trocas' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Trocas</a>
-        {% endif %}
-        {% if is_admin %}
-        <a href="{% url 'cadastrar_plantao' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Novo Plantão</a>
-        <a href="{% url 'gerar_escala' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Gerar Escala</a>
-        <a href="{% url 'gerenciar_colaboradores' %}" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Colaboradores</a>
-        {% endif %}
-      {% endif %}
-      <div class="pt-2 border-t border-white/10 mt-2">
-        <form method="post" action="{% url 'logout' %}">
-          {% csrf_token %}
-          <button type="submit" class="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white">Sair</button>
-        </form>
-      </div>
-    </nav>
+  <!-- Menu lateral (celular) -->
+  <div id="fundo-menu" class="hidden fixed inset-0 z-40 bg-black/60 lg:hidden" data-fechar-menu></div>
+  <aside id="menu-celular" class="hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-[#1e1b18] flex-col -translate-x-full transition-transform duration-300 lg:hidden" aria-label="Menu">
+    {% include 'partials/sidebar.html' with mobile=True %}
   </aside>
 
-  <!-- Main Content -->
-  <main class="flex-1 lg:ml-56 pt-12 lg:pt-0 flex flex-col min-h-screen">
-    <div class="px-5 py-5 flex flex-col gap-4 flex-1">
-      {% if messages %}
-      <div class="flex flex-col gap-2">
-        {% for message in messages %}
-        <div class="flex items-start gap-3 px-4 py-3 rounded-xl border text-sm font-medium
-                    {% if message.tags == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-700
-                    {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-700
-                    {% elif message.tags == 'warning' %}bg-amber-50 border-amber-200 text-amber-700
-                    {% else %}bg-blue-50 border-blue-200 text-blue-700{% endif %}">
-          <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {% if message.tags == 'success' %}
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            {% else %}
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            {% endif %}
-          </svg>
-          <span>{{ message }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
+  <!-- Conteúdo -->
+  <main id="conteudo" class="flex-1 lg:ml-60 pt-14 lg:pt-0 flex flex-col min-h-screen min-w-0">
+    <div class="w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-6 flex flex-col gap-4 flex-1">
       {% block content %}{% endblock %}
     </div>
   </main>
 
 </div>
 
+<!-- Avisos -->
+{% if messages %}
+<div class="fixed top-16 lg:top-4 right-4 left-4 sm:left-auto z-[55] flex flex-col gap-2 sm:w-[400px]" aria-live="polite">
+  {% for message in messages %}
+  <div class="toast flex items-start gap-3 pl-4 pr-2 py-3 rounded-2xl border shadow-lg text-sm font-medium bg-white
+              {% if message.tags == 'success' %}border-emerald-200 text-emerald-800
+              {% elif message.tags == 'error' %}border-red-200 text-red-700
+              {% elif message.tags == 'warning' %}border-amber-200 text-amber-800
+              {% else %}border-blue-200 text-blue-800{% endif %}"
+       role="{% if message.tags == 'error' %}alert{% else %}status{% endif %}"
+       {% if message.tags == 'success' or message.tags == 'info' %}data-auto-fechar{% endif %}>
+    <span class="mt-0.5 shrink-0
+                 {% if message.tags == 'success' %}text-emerald-500{% elif message.tags == 'error' %}text-red-500{% elif message.tags == 'warning' %}text-amber-500{% else %}text-blue-500{% endif %}">
+      {% if message.tags == 'success' %}{% include 'partials/icon.html' with nome='check-circle' classe='w-5 h-5' %}
+      {% elif message.tags == 'error' %}{% include 'partials/icon.html' with nome='error' classe='w-5 h-5' %}
+      {% elif message.tags == 'warning' %}{% include 'partials/icon.html' with nome='alert' classe='w-5 h-5' %}
+      {% else %}{% include 'partials/icon.html' with nome='info' classe='w-5 h-5' %}{% endif %}
+    </span>
+    <span class="flex-1 leading-snug">{{ message }}</span>
+    <button type="button" data-fechar-aviso class="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 shrink-0" aria-label="Fechar aviso">
+      {% include 'partials/icon.html' with nome='x' classe='w-4 h-4' %}
+    </button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <script>
-(function(){
-  var o=document.getElementById('open-sidebar-btn'),c=document.getElementById('close-sidebar-btn'),
-      v=document.getElementById('sidebar-overlay'),s=document.getElementById('mobile-sidebar');
-  function openSidebar(){s.classList.remove('hidden');v.classList.remove('hidden');requestAnimationFrame(function(){s.classList.remove('-translate-x-full')});}
-  function closeSidebar(){s.classList.add('-translate-x-full');setTimeout(function(){s.classList.add('hidden');v.classList.add('hidden');},300);}
-  if(o)o.addEventListener('click',openSidebar);
-  if(c)c.addEventListener('click',closeSidebar);
-  if(v)v.addEventListener('click',closeSidebar);
+(function () {
+  // Menu do celular
+  var menu = document.getElementById('menu-celular'), fundo = document.getElementById('fundo-menu');
+  var botaoAbrir = document.querySelector('[data-abrir-menu]');
+  function abrirMenu() {
+    menu.classList.remove('hidden'); menu.classList.add('flex'); fundo.classList.remove('hidden');
+    requestAnimationFrame(function () { menu.classList.remove('-translate-x-full'); });
+    botaoAbrir.setAttribute('aria-expanded', 'true');
+    var foco = menu.querySelector('a, button'); if (foco) foco.focus();
+  }
+  function fecharMenu() {
+    if (menu.classList.contains('hidden')) return;
+    menu.classList.add('-translate-x-full');
+    botaoAbrir.setAttribute('aria-expanded', 'false');
+    setTimeout(function () { menu.classList.add('hidden'); menu.classList.remove('flex'); fundo.classList.add('hidden'); }, 300);
+  }
+  if (botaoAbrir) botaoAbrir.addEventListener('click', abrirMenu);
+  document.querySelectorAll('[data-fechar-menu]').forEach(function (el) { el.addEventListener('click', fecharMenu); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fecharMenu(); });
+
+  // Avisos
+  function fecharAviso(aviso) {
+    aviso.style.transition = 'opacity .2s'; aviso.style.opacity = '0';
+    setTimeout(function () { aviso.remove(); }, 200);
+  }
+  document.querySelectorAll('[data-fechar-aviso]').forEach(function (b) {
+    b.addEventListener('click', function () { fecharAviso(b.closest('.toast')); });
+  });
+  document.querySelectorAll('[data-auto-fechar]').forEach(function (aviso) {
+    setTimeout(function () { if (aviso.isConnected) fecharAviso(aviso); }, 6000);
+  });
+
+  // Evita envio duplicado (duplo clique em "Salvar", "Confirmar"...).
+  // Não desabilita o botão: o name/value dele precisa ir junto no envio.
+  var SPINNER = '<svg class="w-4 h-4 animate-spin shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity=".25"/><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
+  document.addEventListener('submit', function (e) {
+    if (e.defaultPrevented) return;            // ex.: confirm() cancelado
+    var form = e.target;
+    if (form.hasAttribute('data-enviando')) { e.preventDefault(); return; }
+    form.setAttribute('data-enviando', '');
+    var botao = e.submitter;
+    if (botao && !botao.hasAttribute('data-sem-carregando') && form.method.toLowerCase() === 'post') {
+      botao.setAttribute('data-carregando', '');
+      botao.setAttribute('aria-busy', 'true');
+      botao.classList.add('inline-flex', 'items-center', 'justify-center', 'gap-2');
+      botao.insertAdjacentHTML('afterbegin', SPINNER);
+    }
+  });
+  // Ao voltar pelo navegador, libera os formulários de novo
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    document.querySelectorAll('form[data-enviando]').forEach(function (f) { f.removeAttribute('data-enviando'); });
+    document.querySelectorAll('[data-carregando]').forEach(function (b) {
+      b.removeAttribute('data-carregando'); b.removeAttribute('aria-busy');
+      var s = b.querySelector('svg.animate-spin'); if (s) s.remove();
+    });
+  });
 })();
 </script>
 {% block extra_js %}{% endblock %}

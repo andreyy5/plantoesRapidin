@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -171,33 +171,65 @@ class TrocaPlantao(models.Model):
     def __str__(self):
         return f"{self.solicitante.nome_completo} ↔ {self.destinatario.nome_completo} ({self.status})"
     
-    def aceitar_troca(self):
+    def validar_para_aceite(self):
+        """Confere se a troca ainda pode ser feita. Lança ValueError se não."""
         if self.status != 'PENDENTE':
             raise ValueError('Apenas trocas pendentes podem ser aceitas')
-        
-        temp_colab = self.plantao_solicitante.colaborador
-        self.plantao_solicitante.colaborador = self.plantao_destinatario.colaborador
-        self.plantao_destinatario.colaborador = temp_colab
-        
-        self.plantao_solicitante.save()
-        self.plantao_destinatario.save()
-        
-        self.status = 'ACEITA'
-        self.respondido_em = timezone.now()
-        self.save()
-    
+        ps, pd = self.plantao_solicitante, self.plantao_destinatario
+        if ps.colaborador_id != self.solicitante_id or pd.colaborador_id != self.destinatario_id:
+            raise ValueError(
+                'Os plantões desta solicitação já mudaram de responsável. '
+                'A troca não pode mais ser feita.'
+            )
+        hoje = timezone.localdate()
+        if ps.data < hoje or pd.data < hoje:
+            raise ValueError('Um dos plantões desta troca já passou.')
+
+    def aceitar_troca(self):
+        """
+        Troca os responsáveis dos dois plantões. Retorna as outras solicitações
+        pendentes envolvendo esses plantões, que são canceladas automaticamente.
+        """
+        with transaction.atomic():
+            atual = TrocaPlantao.objects.select_for_update().select_related(
+                'plantao_solicitante', 'plantao_destinatario'
+            ).get(pk=self.pk)
+            atual.validar_para_aceite()
+
+            ps, pd = atual.plantao_solicitante, atual.plantao_destinatario
+            ps.colaborador_id, pd.colaborador_id = pd.colaborador_id, ps.colaborador_id
+            ps.save()
+            pd.save()
+
+            agora = timezone.now()
+            self.status, self.respondido_em = 'ACEITA', agora
+            self.save()
+
+            outras = list(
+                TrocaPlantao.objects.filter(status='PENDENTE')
+                .filter(
+                    models.Q(plantao_solicitante__in=(ps, pd)) |
+                    models.Q(plantao_destinatario__in=(ps, pd))
+                )
+                .exclude(pk=self.pk)
+            )
+            for troca in outras:
+                troca.status, troca.respondido_em = 'CANCELADA', agora
+                troca.save()
+            return outras
+
     def recusar_troca(self):
         if self.status != 'PENDENTE':
             raise ValueError('Apenas trocas pendentes podem ser recusadas')
-        
+
         self.status = 'RECUSADA'
         self.respondido_em = timezone.now()
         self.save()
-    
+
     def cancelar_troca(self):
         if self.status != 'PENDENTE':
             raise ValueError('Apenas trocas pendentes podem ser canceladas')
-        
+
         self.status = 'CANCELADA'
         self.respondido_em = timezone.now()
         self.save()

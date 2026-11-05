@@ -15,6 +15,22 @@
   </a>
 </div>
 
+<!-- Situação da equipe -->
+{% if faltam_colaboradores %}
+<div class="flex items-start gap-3 px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-700">
+  {% include 'partials/icon.html' with nome='error' classe='w-5 h-5 shrink-0 mt-0.5' %}
+  <p>
+    <strong>{{ ativos }} ativo{{ ativos|pluralize }} de {{ min_colaboradores }} necessários.</strong>
+    Falta{{ faltam_colaboradores|pluralize:"m" }} {{ faltam_colaboradores }} para gerar a escala automática, já que ninguém pode pegar plantão em dois domingos seguidos.
+  </p>
+</div>
+{% else %}
+<div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
+  {% include 'partials/icon.html' with nome='check-circle' classe='w-5 h-5 shrink-0' %}
+  <p><strong>{{ ativos }} ativos.</strong> A equipe tem gente suficiente para gerar a escala (mínimo {{ min_colaboradores }}).</p>
+</div>
+{% endif %}
+
 <!-- Tabela -->
 <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
   <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
@@ -37,11 +53,16 @@
       </thead>
       <tbody>
         {% for colaborador in colaboradores %}
-        <tr class="hover:bg-gray-50/70 transition-colors">
+        <tr class="hover:bg-gray-50/70 transition-colors {% if not colaborador.ativo %}text-gray-400{% endif %}">
           <td class="py-3 px-4 border-b border-gray-50">
-            <span class="inline-flex w-7 h-7 rounded-lg bg-[#E94920]/10 text-[#E94920] text-xs font-bold items-center justify-center">{{ colaborador.ordem_fila }}</span>
+            <span class="inline-flex w-7 h-7 rounded-lg text-xs font-bold items-center justify-center {% if colaborador.ativo %}bg-[#E94920]/10 text-[#E94920]{% else %}bg-gray-100 text-gray-400{% endif %}">{{ colaborador.ordem_fila }}</span>
           </td>
-          <td class="py-3 px-4 text-sm font-semibold text-[#50443C] border-b border-gray-50">{{ colaborador.nome_completo }}</td>
+          <td class="py-3 px-4 border-b border-gray-50">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center shrink-0 uppercase {% if colaborador.ativo %}bg-[#E94920]/10 text-[#E94920]{% else %}bg-gray-100 text-gray-400{% endif %}" aria-hidden="true">{{ colaborador.nome_completo|slice:":1" }}</span>
+              <span class="text-sm font-semibold {% if colaborador.ativo %}text-[#50443C]{% endif %}">{{ colaborador.nome_completo }}</span>
+            </div>
+          </td>
           <td class="py-3 px-4 text-center border-b border-gray-50">
             {% if colaborador.ativo %}
             <span class="inline-flex px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-emerald-500/10 text-emerald-700">Ativo</span>
@@ -51,9 +72,11 @@
           </td>
           <td class="py-3 px-4 text-center border-b border-gray-50">
             {% if colaborador.user %}
-            <span class="text-xs font-medium text-[#50443C]">{{ colaborador.user.username }}</span>
+            <span class="inline-flex items-center gap-1 text-xs font-medium text-[#50443C]">
+              {% include 'partials/icon.html' with nome='user' classe='w-3.5 h-3.5 text-gray-400' %}{{ colaborador.user.username }}
+            </span>
             {% else %}
-            <span class="text-xs text-gray-300">Sem vínculo</span>
+            <a href="{% url 'editar_colaborador' colaborador.id %}" class="text-xs text-gray-400 hover:text-[#E94920] underline decoration-dotted underline-offset-2" title="Vincular a um usuário de acesso">Sem acesso · vincular</a>
             {% endif %}
           </td>
           <td class="py-3 px-4 text-center border-b border-gray-50">
@@ -89,8 +112,8 @@
     <p class="text-xs text-gray-500 mb-3">A <span class="font-semibold text-[#50443C]">ordem da fila</span> determina a sequência em que os colaboradores serão escalados para os plantões.</p>
     <ul class="space-y-1.5 text-xs text-gray-500">
       <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span>O colaborador com ordem <span class="font-semibold text-[#50443C] mx-1">1</span> é o primeiro da fila</li>
-      <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span>A cada semana, a fila avança 2 posições</li>
-      <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span>Quando chega ao fim, recomeça do início (circular)</li>
+      <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span>Quem trabalhou num fim de semana vai para o fim da fila; quem está há mais tempo sem plantão vem primeiro</li>
+      <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#E94920] mt-1.5 shrink-0"></span>A ordem cadastrada desempata quando todos estão em situação igual (por exemplo, na primeira escala)</li>
       <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5 shrink-0"></span>Colaboradores <span class="font-semibold text-[#50443C] mx-1">inativos</span> não aparecem na escala automática</li>
     </ul>
     <div class="mt-4 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700 flex items-start gap-2">

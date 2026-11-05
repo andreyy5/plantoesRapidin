@@ -61,16 +61,20 @@
         {% if troca.mensagem %}
         <p class="text-xs text-gray-400 italic max-w-[160px]">"{{ troca.mensagem|truncatewords:8 }}"</p>
         {% endif %}
-        <a href="{% url 'responder_troca' troca.id 'aceitar' %}"
-           onclick="return confirm('Confirma a troca de plantão?')"
-           class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-center">
-          Aceitar
-        </a>
-        <a href="{% url 'responder_troca' troca.id 'recusar' %}"
-           onclick="return confirm('Tem certeza que deseja recusar?')"
-           class="px-4 py-2 rounded-xl text-xs font-bold bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors text-center">
-          Recusar
-        </a>
+        <form method="post" action="{% url 'responder_troca' troca.id 'aceitar' %}"
+              onsubmit="return confirm('Confirma a troca de plantão?')">
+          {% csrf_token %}
+          <button type="submit" class="w-full px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-center">
+            Aceitar
+          </button>
+        </form>
+        <form method="post" action="{% url 'responder_troca' troca.id 'recusar' %}"
+              onsubmit="return confirm('Tem certeza que deseja recusar?')">
+          {% csrf_token %}
+          <button type="submit" class="w-full px-4 py-2 rounded-xl text-xs font-bold bg-white border border-red-200 text-red-500 hover:bg-red-50 transition-colors text-center">
+            Recusar
+          </button>
+        </form>
       </div>
     </div>
   </div>
@@ -125,11 +129,13 @@
           </td>
           <td class="py-3 px-4 text-center border-b border-gray-50">
             {% if troca.status == 'PENDENTE' %}
-            <a href="{% url 'cancelar_troca' troca.id %}"
-               onclick="return confirm('Cancelar esta solicitação?')"
-               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
-              Cancelar
-            </a>
+            <form method="post" action="{% url 'cancelar_troca' troca.id %}"
+                  onsubmit="return confirm('Cancelar esta solicitação?')" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                Cancelar
+              </button>
+            </form>
             {% else %}
             <span class="text-gray-300 text-xs">--</span>
             {% endif %}

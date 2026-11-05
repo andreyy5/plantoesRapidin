@@ -1,10 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q
-from datetime import datetime, timedelta
+from django.db import transaction
+from django.db.models import Q, Max
+from django.urls import reverse
+from django.views.decorators.http import require_POST
+from datetime import date, datetime, timedelta
+from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Plantao, Colaborador, EscalaAutomatica, TrocaPlantao, Notificacao
 from .forms import PlantaoForm, ColaboradorForm, EscalaAutomaticaForm, FiltroPlantaoForm
+from . import escala
 from django.http import HttpResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -74,10 +79,33 @@ def admin_required(view_func):
     """Decorator que permite apenas administradores"""
     def wrapper(request, *args, **kwargs):
         if not is_admin(request.user):
-            messages.error(request, '🔒 Você não tem permissão para acessar esta página.')
+            messages.error(request, 'Você não tem permissão para acessar esta página.')
             return redirect('dashboard')
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+# ========== REGRAS DA ESCALA ==========
+
+def _registro_do_form(form, plantao_id=None):
+    dados = form.cleaned_data
+    return escala.Registro(plantao_id, dados['colaborador'].id, dados['data'], dados['turno'])
+
+
+def _avisar_regras(request, violacoes):
+    for v in violacoes:
+        messages.warning(request, f'Atenção à regra da escala: {v.texto}')
+
+
+def _proximo_sabado_livre():
+    """Sábado seguinte ao último fim de semana já escalado (ou ao dia de hoje)."""
+    hoje = timezone.localdate()
+    ultimo = (
+        Plantao.objects
+        .filter(turno__in=escala.TURNOS_FIM_DE_SEMANA, data__gte=hoje)
+        .aggregate(m=Max('data'))['m']
+    )
+    return escala.proximo_sabado(ultimo or hoje)
 
 
 # ========== VIEWS SAC ==========
@@ -90,7 +118,7 @@ def dashboard(request):
     
     # 🔴 CRÍTICO: Se for técnico, redireciona para dashboard de técnicos
     if user_type == 'tecnico':
-        messages.warning(request, '⚠️ Você é um técnico de campo.')
+        messages.warning(request, 'Você é um técnico de campo.')
         return redirect('dashboard_tecnicos')
     
     # Filtros
@@ -108,7 +136,7 @@ def dashboard(request):
             plantoes = plantoes.filter(colaborador=colaborador_user)
         else:
             plantoes = Plantao.objects.none()
-            messages.info(request, 'ℹ️ Você ainda não está vinculado a um colaborador.')
+            messages.info(request, 'Você ainda não está vinculado a um colaborador.')
     
     # Aplicar filtros se o form for válido
     if filtro_form.is_valid():
@@ -129,42 +157,167 @@ def dashboard(request):
         if dia_semana:
             plantoes = plantoes.filter(dia_semana=dia_semana)
     else:
-        hoje = datetime.now().date()
-        inicio_semana_atual = hoje - timedelta(days=hoje.weekday())  # ← Calcula segunda-feira
-        data_fim = inicio_semana_atual + timedelta(weeks=8) - timedelta(days=1)  # ← 8 semanas completas
-        plantoes = plantoes.filter(data__gte=inicio_semana_atual, data__lte=data_fim)
-    
-    # Agrupar plantões por semana
-    plantoes_agrupados = {}
-    for plantao in plantoes:
-        inicio_semana = plantao.data - timedelta(days=plantao.data.weekday())
-        semana_key = inicio_semana.strftime('%Y-%m-%d')
-        
-        if semana_key not in plantoes_agrupados:
-            plantoes_agrupados[semana_key] = {
-                'inicio': inicio_semana,
-                'fim': inicio_semana + timedelta(days=6),
-                'plantoes': []
-            }
-        plantoes_agrupados[semana_key]['plantoes'].append(plantao)
-    
-    plantoes_agrupados = dict(sorted(plantoes_agrupados.items()))
-    
-    # Contar colaboradores ativos
+        # Padrão: da semana atual até 8 semanas completas
+        hoje = timezone.localdate()
+        data_inicio = hoje - timedelta(days=hoje.weekday())
+        data_fim = data_inicio + timedelta(weeks=8) - timedelta(days=1)
+        plantoes = plantoes.filter(data__gte=data_inicio, data__lte=data_fim)
+
+    plantoes = list(plantoes)
+    admin = is_admin(request.user)
+    hoje = timezone.localdate()
+
+    # Alertas de regra (somente admin), no período exibido
+    alertas_escala = []
+    if admin and plantoes:
+        alertas_escala = escala.violacoes_no_periodo(
+            data_inicio or plantoes[0].data, data_fim or plantoes[-1].data
+        )
+
+    filtrando_pessoas = filtro_form.is_valid() and (
+        filtro_form.cleaned_data.get('colaborador') or filtro_form.cleaned_data.get('dia_semana')
+    )
+    # Horários vagos só fazem sentido para o admin vendo a escala inteira
+    mostrar_vagos = admin and not filtrando_pessoas
+    semanas = _semanas_do_dashboard(plantoes, data_inicio, data_fim, hoje, mostrar_vagos)
+
+    proximo_plantao = None
+    if colaborador_user:
+        proximo_plantao = (
+            Plantao.objects.filter(colaborador=colaborador_user, data__gte=hoje)
+            .order_by('data', 'hora_inicio').first()
+        )
+
     colaboradores_count = Colaborador.objects.filter(ativo=True).count()
-    
+
     context = {
-        'plantoes_agrupados': plantoes_agrupados,
+        'semanas': semanas,
         'filtro_form': filtro_form,
-        'total_plantoes': plantoes.count(),
+        'filtros_abertos': bool(filtrando_pessoas),
+        'periodo_inicio': data_inicio,
+        'periodo_fim': data_fim,
+        'atalhos_periodo': _atalhos_periodo(request, hoje),
+        'total_plantoes': len(plantoes),
         'colaboradores_count': colaboradores_count,
-        'is_admin': is_admin(request.user),
+        'min_colaboradores': escala.MIN_COLABORADORES,
+        'faltam_colaboradores': max(0, escala.MIN_COLABORADORES - colaboradores_count),
+        'is_admin': admin,
         'is_colaborador': user_type == 'colaborador',
         'colaborador_logado': colaborador_user,
+        'proximo_plantao': proximo_plantao,
+        'dias_ate_proximo': (proximo_plantao.data - hoje).days if proximo_plantao else None,
         'user_type': user_type,
+        'alertas_escala': alertas_escala,
+        'hoje': hoje,
+        'voltar_para': request.get_full_path(),
     }
-    
+
     return render(request, 'dashboard/home.html', context)
+
+
+_COLUNAS_FDS = (
+    ('Sábado', 5, ('SABADO_TARDE1', 'SABADO_TARDE2')),
+    ('Domingo', 6, ('DOMINGO_MANHA', 'DOMINGO_TARDE1', 'DOMINGO_TARDE2')),
+)
+_MAX_SEMANAS_VAZIAS = 26
+
+
+def _semanas_do_dashboard(plantoes, data_inicio, data_fim, hoje, mostrar_vagos):
+    """
+    Agrupa os plantões por semana (seg–dom) no formato do quadro do dashboard:
+    colunas de sábado e domingo com um espaço por turno, mais os avulsos.
+    """
+    por_semana = {}
+    for p in plantoes:
+        por_semana.setdefault(p.data - timedelta(days=p.data.weekday()), []).append(p)
+
+    inicios = set(por_semana)
+    if mostrar_vagos and data_inicio and data_fim:
+        segunda = data_inicio - timedelta(days=data_inicio.weekday())
+        if (data_fim - segunda).days <= _MAX_SEMANAS_VAZIAS * 7:
+            while segunda <= data_fim:
+                inicios.add(segunda)
+                segunda += timedelta(weeks=1)
+
+    semanas = []
+    for inicio in sorted(inicios):
+        da_semana = por_semana.get(inicio, [])
+        por_dia_turno = {(p.data, p.turno): p for p in da_semana}
+        usados = set()
+        colunas = []
+        for titulo, offset, turnos in _COLUNAS_FDS:
+            dia = inicio + timedelta(days=offset)
+            slots = []
+            for turno in turnos:
+                p = por_dia_turno.get((dia, turno))
+                if p:
+                    usados.add(p.id)
+                if p or mostrar_vagos:
+                    ini, fim = Plantao.get_horarios_por_turno(turno)
+                    slots.append({'turno': turno, 'inicio': ini, 'fim': fim, 'plantao': p})
+            if slots:
+                colunas.append({'titulo': titulo, 'data': dia, 'slots': slots})
+
+        domingo = inicio + timedelta(days=6)
+        if domingo < hoje:
+            status = 'passada'
+        elif inicio <= hoje:
+            status = 'atual'
+        else:
+            status = 'futura'
+
+        semanas.append({
+            'inicio': inicio,
+            'fim': domingo,
+            'sabado': inicio + timedelta(days=5),
+            'status': status,
+            'colunas': colunas,
+            'avulsos': [p for p in da_semana if p.id not in usados],
+            'vazia': not da_semana,
+            'vagos': sum(1 for c in colunas for s in c['slots'] if not s['plantao']),
+        })
+    return semanas
+
+
+def _atalhos_periodo(request, hoje):
+    """Atalhos de período do dashboard (próximas semanas, este mês...)."""
+    def mes(ano, m):
+        inicio = date(ano, m, 1)
+        proximo = date(ano + (m == 12), m % 12 + 1, 1)
+        return inicio, proximo - timedelta(days=1)
+
+    ano, m = hoje.year, hoje.month
+    opcoes = [
+        ('Próximas 8 semanas', None),
+        ('Mês passado', mes(ano - (m == 1), (m - 2) % 12 + 1)),
+        ('Este mês', mes(ano, m)),
+        ('Próximo mês', mes(ano + (m == 12), m % 12 + 1)),
+    ]
+    atual = (request.GET.get('data_inicio'), request.GET.get('data_fim'))
+    outros_filtros = request.GET.get('colaborador') or request.GET.get('dia_semana')
+    base = reverse('dashboard')
+    atalhos = []
+    for label, periodo in opcoes:
+        if periodo is None:
+            atalhos.append({'label': label, 'url': base, 'ativo': not request.GET})
+        else:
+            ini, fim = periodo
+            atalhos.append({
+                'label': label,
+                'url': f'{base}?data_inicio={ini:%Y-%m-%d}&data_fim={fim:%Y-%m-%d}',
+                'ativo': atual == (ini.isoformat(), fim.isoformat()) and not outros_filtros,
+            })
+    return atalhos
+
+
+def _redirecionar_para_origem(request, padrao='dashboard'):
+    """Volta para a página de origem (?voltar_para=...) se for do próprio site."""
+    destino = request.POST.get('voltar_para') or request.GET.get('voltar_para')
+    if destino and url_has_allowed_host_and_scheme(
+        destino, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return redirect(destino)
+    return redirect(padrao)
 
 
 @login_required
@@ -176,15 +329,20 @@ def cadastrar_plantao(request):
         form = PlantaoForm(request.POST)
         if form.is_valid():
             try:
+                novas = escala.violacoes_novas(adicionar=[_registro_do_form(form)])
                 plantao = form.save()
-                messages.success(request, f'✅ Plantão cadastrado com sucesso para {plantao.colaborador.nome_completo}!')
-                return redirect('dashboard')
+                messages.success(request, f'Plantão cadastrado com sucesso para {plantao.colaborador.nome_completo}!')
+                _avisar_regras(request, novas)
+                return _redirecionar_para_origem(request)
             except Exception as e:
-                messages.error(request, f'❌ Erro ao cadastrar plantão: {str(e)}')
+                messages.error(request, f'Erro ao cadastrar plantão: {str(e)}')
         else:
-            messages.error(request, '⚠️ Por favor, corrija os erros no formulário.')
+            messages.error(request, 'Por favor, corrija os erros no formulário.')
     else:
-        form = PlantaoForm()
+        form = PlantaoForm(initial={
+            campo: request.GET[campo]
+            for campo in ('data', 'turno', 'colaborador') if request.GET.get(campo)
+        })
     
     context = {
         'form': form,
@@ -205,11 +363,16 @@ def editar_plantao(request, plantao_id):
         form = PlantaoForm(request.POST, instance=plantao)
         if form.is_valid():
             try:
+                novas = escala.violacoes_novas(
+                    remover_ids=[plantao.id],
+                    adicionar=[_registro_do_form(form, plantao.id)],
+                )
                 form.save()
-                messages.success(request, '✅ Plantão atualizado com sucesso!')
-                return redirect('dashboard')
+                messages.success(request, 'Plantão atualizado com sucesso!')
+                _avisar_regras(request, novas)
+                return _redirecionar_para_origem(request)
             except Exception as e:
-                messages.error(request, f'❌ Erro ao atualizar plantão: {str(e)}')
+                messages.error(request, f'Erro ao atualizar plantão: {str(e)}')
     else:
         form = PlantaoForm(instance=plantao)
     
@@ -232,8 +395,8 @@ def deletar_plantao(request, plantao_id):
     if request.method == 'POST':
         colaborador_nome = plantao.colaborador.nome_completo
         plantao.delete()
-        messages.success(request, f'✅ Plantão de {colaborador_nome} removido com sucesso!')
-        return redirect('dashboard')
+        messages.success(request, f'Plantão de {colaborador_nome} removido com sucesso!')
+        return _redirecionar_para_origem(request)
     
     context = {
         'plantao': plantao,
@@ -245,74 +408,52 @@ def deletar_plantao(request, plantao_id):
 @login_required
 @admin_required
 def gerar_escala_automatica(request):
-    """Gera escala automática - APENAS ADMIN"""
-    
+    """
+    Gera escala automática - APENAS ADMIN.
+
+    1º passo (acao=visualizar): monta a proposta e mostra, sem gravar.
+    2º passo (acao=confirmar): monta de novo e grava tudo de uma vez.
+    """
+    proposta = None
+
     if request.method == 'POST':
         form = EscalaAutomaticaForm(request.POST)
         if form.is_valid():
-            escala = form.save(commit=False)
-            escala.criada_por = request.user
-            escala.save()
-            
+            data_inicio = form.cleaned_data['data_inicio']
+            semanas = form.cleaned_data['semanas_gerar']
             try:
-                plantoes_criados = _criar_plantoes_automaticos(
-                    escala.data_inicio,
-                    escala.semanas_gerar
-                )
-                messages.success(
-                    request, 
-                    f'✅ Escala gerada com sucesso! {plantoes_criados} plantões criados.'
-                )
-                return redirect('dashboard')
-            except Exception as e:
-                messages.error(request, f'❌ Erro ao gerar escala: {str(e)}')
-                escala.delete()
+                proposta = escala.montar(data_inicio, semanas)
+                if request.POST.get('acao') == 'confirmar':
+                    criados = escala.salvar(proposta, request.user)
+                    messages.success(
+                        request,
+                        f'Escala gerada com sucesso! {criados} plantões criados '
+                        f'de {proposta.data_inicio:%d/%m/%Y} a {proposta.data_fim:%d/%m/%Y}.'
+                    )
+                    url = reverse('dashboard')
+                    return redirect(
+                        f'{url}?data_inicio={proposta.data_inicio:%Y-%m-%d}'
+                        f'&data_fim={proposta.data_fim:%Y-%m-%d}'
+                    )
+            except escala.EscalaImpossivel as e:
+                proposta = None
+                form.add_error(None, str(e))
     else:
-        hoje = datetime.now().date()
-        dias_ate_sabado = (5 - hoje.weekday()) % 7
-        if dias_ate_sabado == 0:
-            dias_ate_sabado = 7
-        proximo_sabado = hoje + timedelta(days=dias_ate_sabado)
-        
-        form = EscalaAutomaticaForm(initial={'data_inicio': proximo_sabado})
-    
+        form = EscalaAutomaticaForm(initial={
+            'data_inicio': request.GET.get('data_inicio') or _proximo_sabado_livre(),
+            'semanas_gerar': 4,
+        })
+
     context = {
         'form': form,
         'titulo': 'Gerar Escala Automática',
+        'proposta': proposta,
+        'max_dias_seguidos': escala.MAX_DIAS_SEGUIDOS,
+        'min_colaboradores': escala.MIN_COLABORADORES,
+        'colaboradores_ativos': Colaborador.objects.filter(ativo=True).count(),
     }
-    
+
     return render(request, 'dashboard/gerar_escala.html', context)
-
-
-def _criar_plantoes_automaticos(data_inicio, semanas):
-    """Lógica para criar plantões automaticamente seguindo a regra da fila"""
-    
-    colaboradores = list(Colaborador.objects.filter(ativo=True).order_by('ordem_fila'))
-    
-    if len(colaboradores) < 2:
-        raise ValueError('É necessário ter pelo menos 2 colaboradores ativos!')
-    
-    plantoes_criados = 0
-    indice_fila = 0
-    
-    for semana in range(semanas):
-        sabado = data_inicio + timedelta(weeks=semana)
-        domingo = sabado + timedelta(days=1)
-        
-        colab_sabado_tarde = colaboradores[indice_fila % len(colaboradores)]
-        colab_sabado_noite = colaboradores[(indice_fila + 1) % len(colaboradores)]
-        colab_domingo_noite = colaboradores[(indice_fila + 2) % len(colaboradores)]
-        
-        Plantao.objects.create(colaborador=colab_sabado_tarde, data=sabado, turno='SABADO_TARDE1')
-        Plantao.objects.create(colaborador=colab_sabado_noite, data=sabado, turno='SABADO_TARDE2')
-        Plantao.objects.create(colaborador=colab_sabado_noite, data=domingo, turno='DOMINGO_MANHA')
-        Plantao.objects.create(colaborador=colab_sabado_tarde, data=domingo, turno='DOMINGO_TARDE1')
-        Plantao.objects.create(colaborador=colab_domingo_noite, data=domingo, turno='DOMINGO_TARDE2')
-        
-        plantoes_criados += 5
-        indice_fila += 2
-    
-    return plantoes_criados
 
 
 @login_required
@@ -320,10 +461,14 @@ def _criar_plantoes_automaticos(data_inicio, semanas):
 def gerenciar_colaboradores(request):
     """Listar e gerenciar colaboradores - APENAS ADMIN"""
     
-    colaboradores = Colaborador.objects.all().order_by('ordem_fila')
-    
+    colaboradores = Colaborador.objects.select_related('user').order_by('-ativo', 'ordem_fila', 'nome_completo')
+    ativos = sum(1 for c in colaboradores if c.ativo)
+
     context = {
         'colaboradores': colaboradores,
+        'ativos': ativos,
+        'min_colaboradores': escala.MIN_COLABORADORES,
+        'faltam_colaboradores': max(0, escala.MIN_COLABORADORES - ativos),
     }
     
     return render(request, 'dashboard/colaboradores.html', context)
@@ -338,7 +483,7 @@ def cadastrar_colaborador(request):
         form = ColaboradorForm(request.POST)
         if form.is_valid():
             colaborador = form.save()
-            messages.success(request, f'✅ Colaborador {colaborador.nome_completo} cadastrado com sucesso!')
+            messages.success(request, f'Colaborador {colaborador.nome_completo} cadastrado com sucesso!')
             return redirect('gerenciar_colaboradores')
     else:
         ultima_ordem = Colaborador.objects.count()
@@ -363,7 +508,7 @@ def editar_colaborador(request, colaborador_id):
         form = ColaboradorForm(request.POST, instance=colaborador)
         if form.is_valid():
             form.save()
-            messages.success(request, f'✅ Colaborador {colaborador.nome_completo} atualizado com sucesso!')
+            messages.success(request, f'Colaborador {colaborador.nome_completo} atualizado com sucesso!')
             return redirect('gerenciar_colaboradores')
     else:
         form = ColaboradorForm(instance=colaborador)
@@ -390,7 +535,7 @@ def _pdf_rodape(canvas, doc):
     canvas.setFillColor(colors.HexColor('#9ca3af'))
     canvas.drawString(
         doc.leftMargin, y - 0.35 * cm,
-        f"Rapidin Plantões — gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}"
+        f"Rapidin Plantões — gerado em {timezone.localtime().strftime('%d/%m/%Y às %H:%M')}"
     )
     canvas.drawRightString(
         doc.leftMargin + doc.width, y - 0.35 * cm,
@@ -423,7 +568,7 @@ def exportar_pdf(request):
     W = doc.width
 
     # ── Dados ──────────────────────────────────────────────────────────────
-    hoje     = datetime.now().date()
+    hoje     = timezone.localdate()
     data_fim = hoje + timedelta(weeks=4)
 
     plantoes = (
@@ -581,23 +726,35 @@ def solicitar_troca(request, plantao_id):
     colaborador_solicitante = get_user_colaborador(request.user)
     
     if not colaborador_solicitante or meu_plantao.colaborador != colaborador_solicitante:
-        messages.error(request, '❌ Você só pode solicitar troca dos seus próprios plantões!')
+        messages.error(request, 'Você só pode solicitar troca dos seus próprios plantões!')
         return redirect('dashboard')
     
-    if meu_plantao.data < datetime.now().date():
-        messages.error(request, '⏰ Não é possível trocar plantões que já passaram!')
+    hoje = timezone.localdate()
+
+    if meu_plantao.data < hoje:
+        messages.error(request, 'Não é possível trocar plantões que já passaram!')
         return redirect('dashboard')
-    
+
     if request.method == 'POST':
         plantao_destino_id = request.POST.get('plantao_destino')
         mensagem = request.POST.get('mensagem', '')
-        
+
         plantao_destino = get_object_or_404(Plantao, id=plantao_destino_id)
-        
+
         if plantao_destino.colaborador == colaborador_solicitante:
-            messages.error(request, '❌ Você não pode trocar com você mesmo!')
+            messages.error(request, 'Você não pode trocar com você mesmo!')
             return redirect('solicitar_troca', plantao_id=plantao_id)
-        
+
+        if plantao_destino.data < hoje:
+            messages.error(request, 'O plantão escolhido já passou!')
+            return redirect('solicitar_troca', plantao_id=plantao_id)
+
+        problemas = _violacoes_da_troca(meu_plantao, plantao_destino)
+        if problemas:
+            for v in problemas:
+                messages.error(request, f'Essa troca não é permitida: {v.texto}')
+            return redirect('solicitar_troca', plantao_id=plantao_id)
+
         troca_existente = TrocaPlantao.objects.filter(
             solicitante=colaborador_solicitante,
             plantao_solicitante=meu_plantao,
@@ -606,7 +763,7 @@ def solicitar_troca(request, plantao_id):
         ).exists()
         
         if troca_existente:
-            messages.warning(request, '⚠️ Você já tem uma solicitação de troca pendente para este plantão!')
+            messages.warning(request, 'Você já tem uma solicitação de troca pendente para este plantão!')
             return redirect('dashboard')
         
         troca = TrocaPlantao.objects.create(
@@ -626,10 +783,9 @@ def solicitar_troca(request, plantao_id):
             troca=troca
         )
         
-        messages.success(request, f'✅ Solicitação de troca enviada para {plantao_destino.colaborador.nome_completo}!')
+        messages.success(request, f'Solicitação de troca enviada para {plantao_destino.colaborador.nome_completo}!')
         return redirect('minhas_trocas')
     
-    hoje = datetime.now().date()
     plantoes_disponiveis = Plantao.objects.select_related('colaborador').filter(
         data__gte=hoje
     ).exclude(
@@ -650,7 +806,7 @@ def minhas_trocas(request):
     
     colaborador = get_user_colaborador(request.user)
     if not colaborador:
-        messages.error(request, '❌ Você precisa estar vinculado a um colaborador!')
+        messages.error(request, 'Você precisa estar vinculado a um colaborador!')
         return redirect('dashboard')
     
     trocas_solicitadas = TrocaPlantao.objects.filter(
@@ -674,25 +830,44 @@ def minhas_trocas(request):
     return render(request, 'dashboard/minhas_trocas.html', context)
 
 
+def _violacoes_da_troca(plantao_a, plantao_b):
+    """Violações de regra que surgiriam ao trocar os responsáveis dos dois plantões."""
+    return escala.violacoes_novas(
+        remover_ids=[plantao_a.id, plantao_b.id],
+        adicionar=[
+            escala.Registro(plantao_a.id, plantao_b.colaborador_id, plantao_a.data, plantao_a.turno),
+            escala.Registro(plantao_b.id, plantao_a.colaborador_id, plantao_b.data, plantao_b.turno),
+        ],
+    )
+
+
 @login_required
+@require_POST
 def responder_troca(request, troca_id, acao):
     """Aceitar ou recusar uma solicitação de troca"""
-    
+
     troca = get_object_or_404(TrocaPlantao, id=troca_id)
     colaborador = get_user_colaborador(request.user)
-    
+
     if troca.destinatario != colaborador:
-        messages.error(request, '❌ Você não pode responder esta solicitação!')
+        messages.error(request, 'Você não pode responder esta solicitação!')
         return redirect('minhas_trocas')
-    
+
     if troca.status != 'PENDENTE':
-        messages.warning(request, '⚠️ Esta solicitação já foi respondida!')
+        messages.warning(request, 'Esta solicitação já foi respondida!')
         return redirect('minhas_trocas')
-    
+
     try:
         if acao == 'aceitar':
-            troca.aceitar_troca()
-            
+            troca.validar_para_aceite()
+            problemas = _violacoes_da_troca(troca.plantao_solicitante, troca.plantao_destinatario)
+            if problemas:
+                for v in problemas:
+                    messages.error(request, f'A troca não pode ser aceita: {v.texto}')
+                return redirect('minhas_trocas')
+
+            canceladas = troca.aceitar_troca()
+
             Notificacao.objects.create(
                 colaborador=troca.solicitante,
                 tipo='TROCA_ACEITA',
@@ -700,9 +875,18 @@ def responder_troca(request, troca_id, acao):
                 mensagem=f"{troca.destinatario.nome_completo} aceitou trocar plantões com você!",
                 troca=troca
             )
-            
-            messages.success(request, '✅ Troca aceita com sucesso! Os plantões foram trocados.')
-            
+            for outra in canceladas:
+                Notificacao.objects.create(
+                    colaborador=outra.solicitante,
+                    tipo='TROCA_CANCELADA',
+                    titulo='Solicitação de Troca Cancelada',
+                    mensagem='Sua solicitação foi cancelada automaticamente porque um dos '
+                             'plantões envolvidos já foi trocado.',
+                    troca=outra
+                )
+
+            messages.success(request, 'Troca aceita com sucesso! Os plantões foram trocados.')
+
         elif acao == 'recusar':
             troca.recusar_troca()
             
@@ -714,15 +898,19 @@ def responder_troca(request, troca_id, acao):
                 troca=troca
             )
             
-            messages.info(request, '❌ Troca recusada.')
-    
+            messages.info(request, 'Troca recusada.')
+
+        else:
+            messages.error(request, 'Ação inválida.')
+
     except ValueError as e:
-        messages.error(request, f'❌ Erro: {str(e)}')
+        messages.error(request, f'Erro: {str(e)}')
     
     return redirect('minhas_trocas')
 
 
 @login_required
+@require_POST
 def cancelar_troca(request, troca_id):
     """Cancela uma solicitação de troca (apenas o solicitante)"""
     
@@ -730,11 +918,11 @@ def cancelar_troca(request, troca_id):
     colaborador = get_user_colaborador(request.user)
     
     if troca.solicitante != colaborador:
-        messages.error(request, '❌ Você não pode cancelar esta solicitação!')
+        messages.error(request, 'Você não pode cancelar esta solicitação!')
         return redirect('minhas_trocas')
     
     if troca.status != 'PENDENTE':
-        messages.warning(request, '⚠️ Não é possível cancelar esta solicitação!')
+        messages.warning(request, 'Não é possível cancelar esta solicitação!')
         return redirect('minhas_trocas')
     
     try:
@@ -748,10 +936,10 @@ def cancelar_troca(request, troca_id):
             troca=troca
         )
         
-        messages.success(request, '✅ Solicitação cancelada com sucesso!')
+        messages.success(request, 'Solicitação cancelada com sucesso!')
     
     except ValueError as e:
-        messages.error(request, f'❌ Erro: {str(e)}')
+        messages.error(request, f'Erro: {str(e)}')
     
     return redirect('minhas_trocas')
 
@@ -797,17 +985,63 @@ def marcar_notificacao_lida(request, notif_id):
     return redirect('notificacoes')
 
 
+# Rota -> item do menu lateral que fica destacado
+_NAV_ITEM_POR_ROTA = {
+    'dashboard': 'sac_escala', 'editar_plantao': 'sac_escala', 'deletar_plantao': 'sac_escala',
+    'cadastrar_plantao': 'sac_novo',
+    'gerar_escala': 'sac_gerar',
+    'gerenciar_colaboradores': 'sac_colab', 'cadastrar_colaborador': 'sac_colab',
+    'editar_colaborador': 'sac_colab',
+    'notificacoes': 'sac_notif',
+    'minhas_trocas': 'sac_trocas', 'solicitar_troca': 'sac_trocas',
+    'dashboard_tecnicos': 'tec_escala', 'editar_plantao_tecnico': 'tec_escala',
+    'deletar_plantao_tecnico': 'tec_escala',
+    'cadastrar_plantao_tecnico': 'tec_novo',
+    'gerar_escala_tecnicos': 'tec_gerar',
+    'gerenciar_tecnicos': 'tec_lista', 'cadastrar_tecnico': 'tec_lista', 'editar_tecnico': 'tec_lista',
+}
+
+
 def notificacoes_processor(request):
-    """Context processor para adicionar notificações não lidas"""
-    if request.user.is_authenticated:
-        colaborador = get_user_colaborador(request.user)
-        if colaborador:
-            nao_lidas = Notificacao.objects.filter(
-                colaborador=colaborador,
-                lida=False
-            ).count()
-            return {'notificacoes_nao_lidas': nao_lidas}
-    return {'notificacoes_nao_lidas': 0}
+    """
+    Context processor: perfil do usuário e item ativo do menu lateral (usados
+    em todas as páginas) e quantidade de notificações não lidas.
+    """
+    rota = getattr(getattr(request, 'resolver_match', None), 'url_name', None)
+    nav_ativo = _NAV_ITEM_POR_ROTA.get(rota, '')
+    contexto = {
+        'notificacoes_nao_lidas': 0,
+        'is_admin': False,
+        'is_colaborador': False,
+        'is_tecnico': False,
+        'nav_ativo': nav_ativo,
+        'nav_area': 'tecnicos' if nav_ativo.startswith('tec_') else 'sac',
+    }
+    # Destino seguro para botões "Voltar"/"Cancelar" (?voltar_para=...)
+    destino = request.GET.get('voltar_para', '')
+    if destino and url_has_allowed_host_and_scheme(
+        destino, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        contexto['voltar_para'] = destino
+
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return contexto
+
+    user_type = get_user_type(user)
+    contexto.update({
+        'user_type': user_type,
+        'is_admin': user_type == 'admin',
+        'is_colaborador': user_type == 'colaborador',
+        'is_tecnico': user_type == 'tecnico',
+    })
+    colaborador = get_user_colaborador(user)
+    if colaborador:
+        contexto['notificacoes_nao_lidas'] = Notificacao.objects.filter(
+            colaborador=colaborador,
+            lida=False
+        ).count()
+    return contexto
 
 
 # ========== VIEWS TÉCNICOS DE CAMPO ==========
@@ -822,7 +1056,7 @@ def dashboard_tecnicos(request):
     
     # 🔴 CRÍTICO: Se for colaborador SAC, redireciona para dashboard SAC
     if user_type == 'colaborador':
-        messages.warning(request, '⚠️ Você é um colaborador SAC.')
+        messages.warning(request, 'Você é um colaborador SAC.')
         return redirect('dashboard')
     
     plantoes = PlantaoTecnico.objects.select_related('tecnico_principal', 'tecnico_dupla').all()
@@ -836,7 +1070,7 @@ def dashboard_tecnicos(request):
             )
         except TecnicoCampo.DoesNotExist:
             plantoes = PlantaoTecnico.objects.none()
-            messages.info(request, 'ℹ️ Você ainda não está vinculado a um técnico.')
+            messages.info(request, 'Você ainda não está vinculado a um técnico.')
     
     # ===== APLICAR FILTROS (Admin apenas) =====
     filtros_aplicados = False
@@ -869,7 +1103,7 @@ def dashboard_tecnicos(request):
     # ===== FILTRO PADRÃO (apenas se NÃO houver filtros manuais) =====
     # 🔧 CORREÇÃO DO BUG: Começar do início da SEMANA ATUAL, não de hoje!
     if not filtros_aplicados:
-        hoje = datetime.now().date()
+        hoje = timezone.localdate()
         
         # Calcular início da semana atual (segunda-feira = dia 0)
         inicio_semana_atual = hoje - timedelta(days=hoje.weekday())
@@ -934,7 +1168,7 @@ def exportar_pdf_tecnicos(request):
     W = doc.width
 
     # ── Dados ──────────────────────────────────────────────────────────────
-    hoje     = datetime.now().date()
+    hoje     = timezone.localdate()
     data_fim = hoje + timedelta(weeks=4)
 
     plantoes = (
@@ -1128,18 +1362,18 @@ def cadastrar_plantao_tecnico(request):
             
             if tipo == 'SABADO_DUPLA':
                 if not tecnico_dupla_id:
-                    messages.error(request, '⚠️ Plantão de sábado precisa de dupla!')
+                    messages.error(request, 'Plantão de sábado precisa de dupla!')
                     return redirect('cadastrar_plantao_tecnico')
                 
                 tecnico_dupla = TecnicoCampo.objects.get(id=tecnico_dupla_id)
                 plantao.tecnico_dupla = tecnico_dupla
             
             plantao.save()
-            messages.success(request, '✅ Plantão técnico cadastrado com sucesso!')
+            messages.success(request, 'Plantão técnico cadastrado com sucesso!')
             return redirect('dashboard_tecnicos')
             
         except Exception as e:
-            messages.error(request, f'❌ Erro: {str(e)}')
+            messages.error(request, f'Erro: {str(e)}')
     
     tecnicos = TecnicoCampo.objects.filter(ativo=True).order_by('nome_completo')
     
@@ -1158,40 +1392,48 @@ def gerar_escala_tecnicos(request):
     from .models import PlantaoTecnico, TecnicoCampo, EscalaAutomaticaTecnico
     
     if request.method == 'POST':
-        data_inicio = request.POST.get('data_inicio')
-        semanas = int(request.POST.get('semanas', 4))
-        
         try:
-            data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-            
-            if data_inicio.weekday() != 5:
-                dias_ate_sabado = (5 - data_inicio.weekday()) % 7
-                if dias_ate_sabado == 0:
-                    dias_ate_sabado = 7
-                data_inicio = data_inicio + timedelta(days=dias_ate_sabado)
-            
-            plantoes_criados = _criar_plantoes_tecnicos(data_inicio, semanas)
-            
-            EscalaAutomaticaTecnico.objects.create(
-                criada_por=request.user,
-                data_inicio=data_inicio,
-                semanas_gerar=semanas
+            data_inicio = datetime.strptime(request.POST.get('data_inicio', ''), '%Y-%m-%d').date()
+            semanas = int(request.POST.get('semanas', 4))
+        except ValueError:
+            messages.error(request, 'Informe uma data e uma quantidade de semanas válidas.')
+            return redirect('gerar_escala_tecnicos')
+
+        if not 1 <= semanas <= 12:
+            messages.error(request, 'Informe de 1 a 12 semanas.')
+            return redirect('gerar_escala_tecnicos')
+
+        if data_inicio.weekday() != 5:
+            data_inicio = escala.proximo_sabado(data_inicio)
+
+        fim = data_inicio + timedelta(weeks=semanas - 1, days=1)
+        if PlantaoTecnico.objects.filter(data__gte=data_inicio, data__lte=fim,
+                                         tipo__in=('SABADO_DUPLA', 'DOMINGO_SOLO')).exists():
+            messages.error(
+                request,
+                f'Já existem plantões de técnicos entre {data_inicio:%d/%m/%Y} e {fim:%d/%m/%Y}. '
+                'Escolha outra data de início ou remova-os antes.'
             )
-            
-            messages.success(request, f'✅ Escala gerada! {plantoes_criados} plantões criados.')
-            return redirect('dashboard_tecnicos')
-            
-        except Exception as e:
-            messages.error(request, f'❌ Erro: {str(e)}')
-    
-    hoje = datetime.now().date()
-    dias_ate_sabado = (5 - hoje.weekday()) % 7
-    if dias_ate_sabado == 0:
-        dias_ate_sabado = 7
-    proximo_sabado = hoje + timedelta(days=dias_ate_sabado)
-    
+            return redirect('gerar_escala_tecnicos')
+
+        try:
+            with transaction.atomic():
+                plantoes_criados = _criar_plantoes_tecnicos(data_inicio, semanas)
+                EscalaAutomaticaTecnico.objects.create(
+                    criada_por=request.user,
+                    data_inicio=data_inicio,
+                    semanas_gerar=semanas
+                )
+        except ValueError as e:
+            messages.error(request, f'Erro: {str(e)}')
+        else:
+            messages.success(request, f'Escala gerada! {plantoes_criados} plantões criados.')
+            return redirect(
+                f"{reverse('dashboard_tecnicos')}?data_inicio={data_inicio:%Y-%m-%d}&data_fim={fim:%Y-%m-%d}"
+            )
+
     context = {
-        'data_sugerida': proximo_sabado,
+        'data_sugerida': escala.proximo_sabado(timezone.localdate()),
     }
     
     return render(request, 'dashboard/tecnicos/gerar_escala.html', context)
@@ -1277,7 +1519,7 @@ def cadastrar_tecnico(request):
             ativo=ativo
         )
         
-        messages.success(request, f'✅ Técnico {nome} cadastrado!')
+        messages.success(request, f'Técnico {nome} cadastrado!')
         return redirect('gerenciar_tecnicos')
     
     ultima_ordem = TecnicoCampo.objects.count()
@@ -1299,15 +1541,25 @@ def editar_plantao_tecnico(request, plantao_id):
     plantao = get_object_or_404(PlantaoTecnico, id=plantao_id)
     
     if request.method == 'POST':
-        plantao.tecnico_principal_id = request.POST.get('tecnico_principal')
-        
+        principal = request.POST.get('tecnico_principal')
+        dupla = request.POST.get('tecnico_dupla') or None
+
+        if not principal:
+            messages.error(request, 'Escolha o técnico principal.')
+            return redirect('editar_plantao_tecnico', plantao_id=plantao.id)
+        if plantao.tipo == 'SABADO_DUPLA' and (not dupla or dupla == principal):
+            messages.error(request, 'O plantão de sábado precisa de uma dupla diferente do técnico principal.')
+            return redirect('editar_plantao_tecnico', plantao_id=plantao.id)
+
+        plantao.tecnico_principal_id = principal
+
         if plantao.tipo == 'SABADO_DUPLA':
-            plantao.tecnico_dupla_id = request.POST.get('tecnico_dupla')
-        
+            plantao.tecnico_dupla_id = dupla
+
         plantao.observacoes = request.POST.get('observacoes', '')
         plantao.save()
         
-        messages.success(request, '✅ Plantão atualizado!')
+        messages.success(request, 'Plantão atualizado!')
         return redirect('dashboard_tecnicos')
     
     tecnicos = TecnicoCampo.objects.filter(ativo=True)
@@ -1331,7 +1583,7 @@ def deletar_plantao_tecnico(request, plantao_id):
     
     if request.method == 'POST':
         plantao.delete()
-        messages.success(request, '✅ Plantão removido!')
+        messages.success(request, 'Plantão removido!')
         return redirect('dashboard_tecnicos')
     
     context = {
@@ -1359,7 +1611,7 @@ def editar_tecnico(request, tecnico_id):
         
         tecnico.save()
         
-        messages.success(request, f'✅ Técnico {tecnico.nome_completo} atualizado!')
+        messages.success(request, f'Técnico {tecnico.nome_completo} atualizado!')
         return redirect('gerenciar_tecnicos')
     
     context = {

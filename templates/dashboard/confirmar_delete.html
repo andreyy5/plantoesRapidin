@@ -10,7 +10,7 @@
       <h1 class="text-lg font-bold text-red-600">Confirmar Exclusão</h1>
       <p class="text-xs text-gray-400 font-medium mt-0.5">Esta ação não pode ser desfeita</p>
     </div>
-    <a href="{% url 'dashboard' %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+    <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard' %}{% endif %}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
       Cancelar
     </a>
@@ -60,7 +60,7 @@
   <form method="post">
     {% csrf_token %}
     <div class="flex items-center justify-between">
-      <a href="{% url 'dashboard' %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
+      <a href="{% if voltar_para %}{{ voltar_para }}{% else %}{% url 'dashboard' %}{% endif %}" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors">
         Não, manter
       </a>
       <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 transition-colors">
