@@ -54,6 +54,9 @@ FERRAMENTAS = [
 ]
 
 _CORES = {c for c, _ in AnotacaoQuadro.CORES}
+_FONTES_TEXTO = {f for f, _ in AnotacaoQuadro.FONTES}
+_TAMANHOS_TEXTO = {t for t, _ in AnotacaoQuadro.TAMANHOS}
+_ESTILO_PADRAO = {'fonte': 'manuscrita', 'tamanho': 'm', 'negrito': False, 'italico': False, 'sublinhado': False}
 _FORMAS = {f for f, _ in TracoQuadro.FORMAS}
 
 
@@ -111,6 +114,23 @@ def _limpar_texto(valor):
     return ' '.join(str(valor or '').split())
 
 
+def _estilo_do_texto(dados):
+    """Fonte, tamanho e negrito/itálico/sublinhado enviados (só o que é válido)."""
+    estilo = {}
+    if dados.get('fonte') in _FONTES_TEXTO:
+        estilo['fonte'] = dados['fonte']
+    if dados.get('tamanho') in _TAMANHOS_TEXTO:
+        estilo['tamanho'] = dados['tamanho']
+    for campo in ('negrito', 'italico', 'sublinhado'):
+        if isinstance(dados.get(campo), bool):
+            estilo[campo] = dados[campo]
+    return estilo
+
+
+def _estilo_json(a):
+    return {campo: getattr(a, campo) for campo in _ESTILO_PADRAO}
+
+
 def _pontos_validos(pontos):
     """Confere o formato [x, y, x, y, ...] e os limites. Devolve a lista ou None."""
     if not isinstance(pontos, list) or len(pontos) < 2 or len(pontos) % 2:
@@ -143,6 +163,7 @@ def _anotacao_json(a):
         'id': a.id,
         'texto': a.texto,
         'cor': a.cor,
+        **_estilo_json(a),
         'autor': _nome(a.criado_por),
         'criado_em': _hora(a.criado_em),
         'editado_por': _nome(a.editado_por) if a.editado_em else None,
@@ -224,6 +245,7 @@ def quadro(request):
             'dados_tracos': [_traco_json(t) for t in _tracos_ativos()],
         },
         'cores': AnotacaoQuadro.CORES,
+        'fontes': AnotacaoQuadro.FONTES,
         'ferramentas': FERRAMENTAS,
         'max_texto': AnotacaoQuadro.MAX_TEXTO,
     })
@@ -286,7 +308,7 @@ def escrever(request):
         return _erro(f'Use no máximo {AnotacaoQuadro.MAX_TEXTO} caracteres por linha.')
     if _ativas().count() >= MAX_LINHAS:
         return _erro(f'O quadro está cheio ({MAX_LINHAS} linhas). Apague o que já foi resolvido.')
-    nova = AnotacaoQuadro.objects.create(texto=texto, cor=cor, criado_por=request.user)
+    nova = AnotacaoQuadro.objects.create(texto=texto, cor=cor, criado_por=request.user, **_estilo_do_texto(dados))
     return _resposta_com_estado(request, id=nova.id)
 
 
@@ -306,6 +328,8 @@ def editar(request, anotacao_id):
         anotacao.texto = texto
     if dados.get('cor') in _CORES:
         anotacao.cor = dados['cor']
+    for campo, valor in _estilo_do_texto(dados).items():
+        setattr(anotacao, campo, valor)
     anotacao.editado_por, anotacao.editado_em = request.user, timezone.now()
     anotacao.save()
     return _resposta_com_estado(request)
@@ -403,7 +427,7 @@ def avisar(request):
     anotacoes = _ativas()
     if 'ids' in dados:
         anotacoes = anotacoes.filter(id__in=_ids(dados['ids']))
-    linhas = [{'texto': a.texto, 'cor': a.cor} for a in anotacoes]
+    linhas = [{'texto': a.texto, 'cor': a.cor, **_estilo_json(a)} for a in anotacoes]
     desenho = []
     if dados.get('desenho', True):
         desenho = [{'cor': t.cor, 'forma': t.forma, 'pontos': t.pontos} for t in _tracos_ativos()]

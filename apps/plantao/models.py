@@ -516,9 +516,25 @@ class AnotacaoQuadro(models.Model):
         ('branco', 'Branco'),
     ]
     MAX_TEXTO = 200
+    FONTES = [
+        ('manuscrita', 'Manuscrita'),
+        ('marcador', 'Marcador'),
+        ('forma', 'Letra de forma'),
+        ('digital', 'Digital'),
+    ]
+    TAMANHOS = [
+        ('p', 'Pequeno'),
+        ('m', 'Médio'),
+        ('g', 'Grande'),
+    ]
 
     texto = models.CharField(max_length=MAX_TEXTO)
     cor = models.CharField(max_length=10, choices=CORES, default='rosa')
+    fonte = models.CharField(max_length=12, choices=FONTES, default='manuscrita')
+    tamanho = models.CharField(max_length=1, choices=TAMANHOS, default='m')
+    negrito = models.BooleanField(default=False)
+    italico = models.BooleanField(default=False)
+    sublinhado = models.BooleanField(default=False)
     criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     editado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     apagado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')

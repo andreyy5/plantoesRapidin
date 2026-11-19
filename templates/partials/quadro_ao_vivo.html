@@ -1,16 +1,28 @@
 {% load static %}{# Quadro Rapidin: consulta periódica, contador no menu e aviso em tela + voz. Incluído no base.html para usuários logados. #}
 <style>
   .font-quadro { font-family: 'Caveat', 'Segoe Print', 'Comic Sans MS', cursive; font-weight: 700; }
-  /* Texto neon: o brilho é proporcional ao tamanho da letra (em) */
+  /* Texto do quadro: cor da caneta com um brilho leve (proporcional ao tamanho da letra) */
   .neon {
     --neon: #ff4fd8;
     color: var(--neon);
-    color: color-mix(in oklab, var(--neon) 70%, white);
-    text-shadow: 0 0 .15em var(--neon), 0 0 .45em var(--neon);
-    text-shadow: 0 0 .06em color-mix(in oklab, var(--neon) 60%, white), 0 0 .22em var(--neon), 0 0 .55em var(--neon),
-                 0 0 .95em color-mix(in oklab, var(--neon) 55%, transparent);
+    color: color-mix(in oklab, var(--neon) 88%, white);
+    text-shadow: 0 0 .3em rgba(255,255,255,.12);
+    text-shadow: 0 0 .04em color-mix(in oklab, var(--neon) 45%, transparent),
+                 0 0 .28em color-mix(in oklab, var(--neon) 30%, transparent);
   }
-  .neon.neon-fraco { text-shadow: 0 0 .05em var(--neon), 0 0 .3em var(--neon), 0 0 .6em color-mix(in oklab, var(--neon) 60%, transparent); }
+  .neon.neon-fraco { text-shadow: 0 0 .25em color-mix(in oklab, var(--neon) 25%, transparent); }
+
+  /* Fonte, tamanho e estilo escolhidos para cada linha. O tamanho final é
+     --base (definido por onde o texto aparece) × --fator (P/M/G) × --escala (cada fonte tem um corpo diferente). */
+  .texto-quadro { font-size: calc(var(--base, 30px) * var(--fator, 1) * var(--escala, 1)); line-height: 1.2; }
+  .fonte-manuscrita { font-family: 'Caveat', 'Segoe Print', cursive; font-weight: 500; --escala: 1; }
+  .fonte-marcador { font-family: 'Permanent Marker', 'Segoe Print', cursive; font-weight: 400; --escala: .74; }
+  .fonte-forma { font-family: 'Poppins', 'Segoe UI', sans-serif; font-weight: 500; --escala: .68; }
+  .fonte-digital { font-family: 'Share Tech Mono', Consolas, monospace; font-weight: 400; --escala: .8; }
+  .tam-p { --fator: .75; } .tam-m { --fator: 1; } .tam-g { --fator: 1.35; }
+  .txt-negrito { font-weight: 700; }
+  .txt-italico { font-style: italic; }
+  .txt-sublinhado { text-decoration: underline; text-decoration-thickness: .06em; text-underline-offset: .15em; }
   .neon::placeholder { color: rgba(255,255,255,.28); text-shadow: none; }
   .neon-vermelho { --neon: #ff4d4d; } .neon-laranja { --neon: #ff8a4c; } .neon-amarelo { --neon: #fff35c; }
   .neon-verde { --neon: #4dff8f; } .neon-ciano { --neon: #2ee6ff; } .neon-azul { --neon: #5c8dff; }
@@ -18,9 +30,9 @@
 
   /* Traços desenhados à mão (SVG; 1 unidade = 1/10000 da largura do quadro) */
   .traco { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-  .traco-brilho { stroke: var(--neon); stroke-width: 95px; opacity: .6; }
-  .traco-nucleo { stroke: var(--neon); stroke: color-mix(in oklab, var(--neon) 62%, white); stroke-width: 30px; }
-  .traco-vivo-brilho { stroke: var(--neon); stroke-width: 90px; opacity: .22; }
+  .traco-brilho { stroke: var(--neon); stroke-width: 80px; opacity: .3; }
+  .traco-nucleo { stroke: var(--neon); stroke: color-mix(in oklab, var(--neon) 85%, white); stroke-width: 30px; }
+  .traco-vivo-brilho { stroke: var(--neon); stroke-width: 80px; opacity: .15; }
 
   /* Moldura neon laranja. Parada por padrão; só se mexe quando isso informa algo:
      .neon-pulso   -> brilha uma vez (alguém mudou o quadro / chegou um aviso)
@@ -59,7 +71,9 @@
   dialog.aviso-embutido > .neon-moldura { width: min(100%, 64rem); max-height: 100%; margin: auto; display: flex; flex-direction: column; }
   dialog.aviso-embutido .neon-moldura__borda,
   dialog.aviso-embutido [data-alerta-painel] { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-  dialog.aviso-embutido #alerta-quadro-linhas li { font-size: clamp(24px, min(3.2vw, 5.5vh), 56px); }
+  #alerta-quadro-linhas li { --base: 26px; }
+  @media (min-width: 640px) { #alerta-quadro-linhas li { --base: 32px; } }
+  dialog.aviso-embutido #alerta-quadro-linhas li { --base: clamp(24px, min(3.2vw, 5.5vh), 56px); }
   dialog.aviso-embutido.com-desenho > .neon-moldura { height: 100%; }
   dialog.aviso-embutido [data-alerta-desenho]:not(.hidden) { flex: 1 1 0; min-height: 120px; position: relative; }
   dialog.aviso-embutido [data-alerta-desenho] svg {
@@ -189,10 +203,17 @@
     },
     pulsar: pulsar,
     formatarHora: formatarHora,
+    classesTexto: classesTexto,
     caminho: caminho,
     criarTraco: criarTraco,
     previa: previa,
   };
+
+  // Classes de fonte, tamanho e estilo de uma linha do quadro (avisos antigos não têm estilo: usa o padrão)
+  function classesTexto(l) {
+    return 'texto-quadro fonte-' + (l.fonte || 'manuscrita') + ' tam-' + (l.tamanho || 'm') +
+      (l.negrito ? ' txt-negrito' : '') + (l.italico ? ' txt-italico' : '') + (l.sublinhado ? ' txt-sublinhado' : '');
+  }
 
   // Faz a moldura neon brilhar uma vez
   function pulsar(moldura) {
@@ -370,7 +391,7 @@
     listaAlerta.replaceChildren();
     a.linhas.forEach(function (l) {
       var li = document.createElement('li');
-      li.className = 'neon neon-' + l.cor + ' font-quadro text-[26px] sm:text-[32px] leading-tight break-words';
+      li.className = 'neon neon-' + l.cor + ' ' + classesTexto(l) + ' break-words';
       li.textContent = l.texto;
       listaAlerta.appendChild(li);
     });

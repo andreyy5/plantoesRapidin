@@ -25,7 +25,9 @@ no cadastro manual (aviso), nas trocas (bloqueio) e no dashboard (alertas).
 ## Quadro Rapidin
 
 Página `/plantao/quadro/` (menu **Quadro Rapidin**), aberta a qualquer usuário logado. Funciona como o
-quadro branco do SAC: cada linha é um aviso (ex.: `Vila Militar 1/1/1 fora`), com cor de caneta neon (9 cores).
+quadro branco do SAC: cada linha é um aviso (ex.: `Vila Militar 1/1/1 fora`), com cor de caneta (9 cores),
+fonte (Manuscrita, Marcador, Letra de forma, Digital), tamanho (P/M/G) e negrito/itálico/sublinhado,
+escolhidos na barra acima do campo de digitar (e também ao editar a linha).
 Escrever, editar e apagar aparece para todos em até ~2 s. Apagar e limpar o quadro podem ser desfeitos.
 
 Ferramentas: **Texto** (digitar), **Caneta** (escrever/desenhar com mouse, caneta ou dedo),

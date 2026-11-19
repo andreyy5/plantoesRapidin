@@ -515,6 +515,26 @@ class QuadroNocTests(TestCase):
         resp = self._post('quadro_restaurar', {'ids': [linha['id']]})
         self.assertEqual([a['id'] for a in resp.json()['quadro']['anotacoes']], [linha['id']])
 
+    def test_fonte_e_estilo_do_texto(self):
+        resp = self._post('quadro_escrever', {'texto': 'Centro 1/12 fora', 'fonte': 'digital', 'tamanho': 'g',
+                                              'negrito': True, 'italico': False, 'sublinhado': True})
+        linha = resp.json()['quadro']['anotacoes'][0]
+        self.assertEqual(
+            {k: linha[k] for k in ('fonte', 'tamanho', 'negrito', 'italico', 'sublinhado')},
+            {'fonte': 'digital', 'tamanho': 'g', 'negrito': True, 'italico': False, 'sublinhado': True})
+        # Editar só o que veio; valores inválidos são ignorados
+        resp = self._post('quadro_editar', {'fonte': 'marcador', 'tamanho': 'xx', 'negrito': 'sim'}, linha['id'])
+        linha = resp.json()['quadro']['anotacoes'][0]
+        self.assertEqual((linha['fonte'], linha['tamanho'], linha['negrito']), ('marcador', 'g', True))
+        # Sem estilo: padrão
+        resp = self._post('quadro_escrever', {'texto': 'simples', 'fonte': 'comic'})
+        nova = resp.json()['quadro']['anotacoes'][1]
+        self.assertEqual((nova['fonte'], nova['tamanho'], nova['negrito']), ('manuscrita', 'm', False))
+        # O aviso guarda o estilo para mostrar igual
+        self._post('quadro_avisar')
+        d = self._novidades(self.sac_user, alerta=0)['alerta']
+        self.assertEqual((d['linhas'][0]['fonte'], d['linhas'][0]['sublinhado']), ('marcador', True))
+
     def test_validacoes_ao_escrever(self):
         self.assertEqual(self._post('quadro_escrever', {'texto': '   '}).status_code, 400)
         self.assertEqual(self._post('quadro_escrever', {'texto': 'x' * 201}).status_code, 400)

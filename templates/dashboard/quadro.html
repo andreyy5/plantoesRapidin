@@ -21,8 +21,14 @@
   .quadro-linhas { position: relative; display: flex; flex-direction: column; gap: .35cqw; padding: 2.4cqw 3cqw 2cqw; }
   .linha { position: relative; border-radius: 1.2cqw; padding: .15cqw 1cqw; transition: background-color .15s; }
   .linha:hover { background: rgba(255,255,255,.035); }
-  .linha-texto { font-size: 3.8cqw; line-height: 1.2; padding-right: 10cqw; overflow-wrap: anywhere; }
-  .linha-edicao { font-size: 3.8cqw; line-height: 1.2; }
+  /* Tamanho base do texto (a fonte e o P/M/G multiplicam isso; ver .texto-quadro no partial) */
+  .linha-texto { --base: 3.8cqw; padding-right: 10cqw; overflow-wrap: anywhere; }
+  .linha-edicao { --base: 3.8cqw; }
+  .base-entrada { --base: 24px; }
+  @media (min-width: 640px) { .base-entrada { --base: 30px; } }
+  .base-lista { --base: 20px; }
+  .base-dialogo { --base: 24px; }
+  .base-botao { --base: 17px; }
   .linha-acoes { position: absolute; top: .45cqw; right: .6cqw; display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity .15s; }
   .linha:hover .linha-acoes, .linha:focus-within .linha-acoes { opacity: 1; }
   @media (hover: none) { .linha-acoes { opacity: 1; } .linha-meta { display: none; } }
@@ -63,7 +69,7 @@
 
   /* ---------- linha nova: aparece como se estivesse sendo escrita ---------- */
   @keyframes escrevendo { from { clip-path: inset(-1em 100% -1em -1em); } to { clip-path: inset(-1em -1em -1em -1em); } }
-  @keyframes acendendo { 0%, 100% { filter: none; } 30% { filter: brightness(1.8); } }
+  @keyframes acendendo { 0%, 100% { filter: none; } 30% { filter: brightness(1.35); } }
   .linha-nova .neon { animation: escrevendo .7s cubic-bezier(.3,.7,.4,1) backwards, acendendo 1.2s ease-out .5s; }
   @keyframes tremer { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
   .tremer { animation: tremer .25s ease 2; }
@@ -210,15 +216,18 @@
               </div>
             </div>
 
-            <form id="form-escrever" class="esconder-tv px-3 sm:px-6 py-3 border-t border-white/10 flex items-center gap-2 sm:gap-3" autocomplete="off" novalidate>
+            <form id="form-escrever" class="esconder-tv px-3 sm:px-6 pt-2.5 pb-3 border-t border-white/10 flex flex-col gap-1.5" autocomplete="off" novalidate>
+              <div id="estilo-novo" role="toolbar" aria-label="Fonte e estilo do texto"></div>
+              <div class="flex items-center gap-2 sm:gap-3">
               <label for="nova-linha" class="sr-only">Escrever no quadro</label>
               <input id="nova-linha" type="text" maxlength="{{ max_texto }}" enterkeyhint="send"
                      placeholder="Digite aqui... ex.: Centro 1/12 fora parcialmente"
-                     class="neon neon-rosa font-quadro flex-1 min-w-0 bg-transparent text-[24px] sm:text-[30px] leading-tight py-1 outline-none focus:outline-none focus-visible:outline-none">
+                     class="neon neon-rosa texto-quadro fonte-manuscrita tam-m base-entrada flex-1 min-w-0 bg-transparent py-1 outline-none focus:outline-none focus-visible:outline-none">
               <button type="submit" class="shrink-0 inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl text-sm font-bold bg-white/10 text-white hover:bg-white/20 transition-colors">
                 {% include 'partials/icon.html' with nome='edit' classe='w-4 h-4' %}
                 <span class="hidden sm:inline">Escrever</span><span class="sr-only sm:hidden">Escrever</span>
               </button>
+              </div>
             </form>
           </div>
         </div>
@@ -345,6 +354,7 @@
 
 {{ estado_inicial|json_script:"estado-inicial" }}
 {{ cores|json_script:"cores-quadro" }}
+{{ fontes|json_script:"fontes-quadro" }}
 
 <template id="tpl-icone-editar">{% include 'partials/icon.html' with nome='edit' classe='w-4 h-4' %}</template>
 <template id="tpl-icone-apagar">{% include 'partials/icon.html' with nome='x' classe='w-4 h-4' %}</template>
@@ -372,6 +382,9 @@
   var ao = window.QuadroAoVivo;
   var LARGURA = ao.LARGURA, MAX_VALORES_TRACO = 4000, SVG_NS = 'http://www.w3.org/2000/svg';
   var CORES = JSON.parse(document.getElementById('cores-quadro').textContent);
+  var FONTES = JSON.parse(document.getElementById('fontes-quadro').textContent);
+  var TAMANHOS = [['p', 'Pequeno'], ['m', 'Médio'], ['g', 'Grande']];
+  var ESTILOS = [['negrito', 'Negrito', 'B', 'font-bold'], ['italico', 'Itálico', 'I', 'italic font-serif'], ['sublinhado', 'Sublinhado', 'U', 'underline']];
   var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
   var estado = JSON.parse(document.getElementById('estado-inicial').textContent);
@@ -482,7 +495,7 @@
     var li = el('li', 'linha');
     li.dataset.id = a.id;
     li.dataset.assinatura = assinatura(a);
-    var texto = el('p', 'linha-texto neon neon-' + a.cor + ' font-quadro', a.texto);
+    var texto = el('p', 'linha-texto neon neon-' + a.cor + ' ' + ao.classesTexto(a), a.texto);
     texto.title = 'Clique duas vezes para editar';
     texto.dataset.editar = '';
     li.appendChild(texto);
@@ -975,7 +988,7 @@
       li.appendChild(el('p', 'text-[11px] font-semibold text-gray-400', a.autor + ' · ' + ao.formatarHora(a.criado_em)));
       var caixa = el('div', 'rounded-xl bg-[#09090e] px-3 py-1.5');
       a.linhas.slice(0, 3).forEach(function (l) {
-        caixa.appendChild(el('p', 'neon neon-fraco neon-' + l.cor + ' font-quadro text-xl leading-snug break-words', l.texto));
+        caixa.appendChild(el('p', 'neon neon-fraco neon-' + l.cor + ' ' + ao.classesTexto(l) + ' base-lista leading-snug break-words', l.texto));
       });
       var resto = a.linhas.length - 3;
       if (resto > 0) caixa.appendChild(el('p', 'text-[11px] text-white/40', '+ ' + plural(resto, 'linha', 'linhas')));
@@ -986,9 +999,64 @@
     if (!estado.avisos.length) ul.appendChild(el('li', 'text-xs text-gray-400', 'Nenhum aviso enviado ainda.'));
   }
 
+  // ---------- fonte e estilo do texto ----------
+  // Botões de fonte (amostra "Abc" em cada uma), tamanho P/M/G e negrito/itálico/sublinhado.
+  // `estilo` é alterado aqui; `aoMudar` é chamado depois de cada clique.
+  var CLASSE_BOTAO_ESTILO = 'inline-flex items-center justify-center h-7 min-w-[28px] px-1.5 rounded-md text-white/55 ' +
+    'hover:text-white hover:bg-white/10 transition-colors aria-pressed:bg-white/20 aria-pressed:text-white';
+  function controlesDeEstilo(estilo, aoMudar) {
+    var barra = el('div', 'flex items-center gap-1.5 flex-wrap');
+    var botoes = [];
+    function grupo(rotulo) {
+      var g = el('div', 'inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-white/[.06]');
+      g.setAttribute('role', 'group'); g.setAttribute('aria-label', rotulo);
+      barra.appendChild(g);
+      return g;
+    }
+    function atualizar() { botoes.forEach(function (b) { b.setAttribute('aria-pressed', b.ativo() ? 'true' : 'false'); }); }
+    function botao(g, conteudo, titulo, classes, ativo, aoClicar) {
+      var b = el('button', CLASSE_BOTAO_ESTILO + ' ' + classes, conteudo);
+      b.type = 'button'; b.title = titulo; b.setAttribute('aria-label', titulo);
+      b.ativo = ativo;
+      b.addEventListener('click', function () { aoClicar(); atualizar(); aoMudar(); });
+      botoes.push(b); g.appendChild(b);
+    }
+    var fontes = grupo('Fonte');
+    FONTES.forEach(function (f) {
+      botao(fontes, 'Abc', 'Fonte: ' + f[1], 'texto-quadro tam-m base-botao px-2 fonte-' + f[0],
+        function () { return estilo.fonte === f[0]; }, function () { estilo.fonte = f[0]; });
+    });
+    var tamanhos = grupo('Tamanho');
+    TAMANHOS.forEach(function (t) {
+      botao(tamanhos, t[0].toUpperCase(), 'Tamanho: ' + t[1], 'text-xs font-bold',
+        function () { return estilo.tamanho === t[0]; }, function () { estilo.tamanho = t[0]; });
+    });
+    var estilos = grupo('Estilo');
+    ESTILOS.forEach(function (x) {
+      botao(estilos, x[2], x[1], 'text-sm ' + x[3],
+        function () { return !!estilo[x[0]]; }, function () { estilo[x[0]] = !estilo[x[0]]; });
+    });
+    atualizar();
+    return barra;
+  }
+  function estiloDe(a) {
+    return { fonte: a.fonte || 'manuscrita', tamanho: a.tamanho || 'm', negrito: !!a.negrito, italico: !!a.italico, sublinhado: !!a.sublinhado };
+  }
+
   // ---------- escrever ----------
   var enviando = false;
-  function pintarEntrada() { entrada.className = entrada.className.replace(/neon-\w+/, 'neon-' + corEscolhida()); }
+  var estiloNovo = estiloDe({});
+  try { estiloNovo = estiloDe(JSON.parse(localStorage.getItem('quadro.estilo') || '{}')); } catch (e) {}
+  var CLASSE_ENTRADA = entrada.className.replace(/\b(neon|fonte|tam|txt)-\w+/g, '').replace(/\s+/g, ' ').trim() + ' neon';
+  function pintarEntrada() {
+    entrada.className = CLASSE_ENTRADA + ' neon-' + corEscolhida() + ' ' + ao.classesTexto(estiloNovo);
+  }
+  document.getElementById('estilo-novo').appendChild(controlesDeEstilo(estiloNovo, function () {
+    try { localStorage.setItem('quadro.estilo', JSON.stringify(estiloNovo)); } catch (e) {}
+    pintarEntrada();
+    entrada.focus();
+  }));
+  pintarEntrada();
   document.querySelectorAll('input[name=cor]').forEach(function (r) {
     r.addEventListener('change', function () {
       pintarEntrada();
@@ -1008,7 +1076,7 @@
     if (!texto) { tremer(entrada); entrada.focus(); return; }
     if (enviando) return;
     enviando = true;
-    enviar(URLS.escrever, { texto: texto, cor: corEscolhida() })
+    enviar(URLS.escrever, Object.assign({ texto: texto, cor: corEscolhida() }, estiloNovo))
       .then(function (d) { entrada.value = ''; mudou(d); })
       .catch(function (err) { toast(err.message, 'erro'); })
       .then(function () { enviando = false; entrada.focus(); });
@@ -1040,15 +1108,20 @@
     li.dataset.assinatura = '';
     var f = el('form', 'flex flex-col gap-2 py-1');
     f.noValidate = true;
-    var campo = el('input', 'linha-edicao neon neon-' + a.cor + ' font-quadro w-full bg-white/[.04] rounded-xl px-2 outline-none ring-1 ring-white/20 focus:ring-white/50');
+    var corAtual = a.cor, estiloEdicao = estiloDe(a);
+    var campo = el('input');
+    function pintarCampo() {
+      campo.className = 'linha-edicao neon neon-' + corAtual + ' ' + ao.classesTexto(estiloEdicao) +
+        ' w-full bg-white/[.04] rounded-xl px-2 outline-none ring-1 ring-white/20 focus:ring-white/50';
+    }
+    pintarCampo();
     campo.value = a.texto; campo.maxLength = {{ max_texto }};
     campo.setAttribute('aria-label', 'Texto da linha');
     f.appendChild(campo);
 
     var barra = el('div', 'flex items-center gap-2 flex-wrap');
-    var cores = el('div', 'flex items-center gap-1.5 mr-auto');
+    var cores = el('div', 'flex items-center gap-1.5');
     cores.setAttribute('role', 'radiogroup'); cores.setAttribute('aria-label', 'Cor da linha');
-    var corAtual = a.cor;
     function marcar() {
       cores.querySelectorAll('button').forEach(function (x) {
         var ativo = x.dataset.cor === corAtual;
@@ -1066,19 +1139,23 @@
       b.setAttribute('aria-label', c[1]);
       b.addEventListener('click', function () {
         corAtual = c[0]; marcar();
-        campo.className = campo.className.replace(/neon-\w+/, 'neon-' + corAtual);
+        pintarCampo();
         campo.focus();
       });
       cores.appendChild(b);
     });
     marcar();
     barra.appendChild(cores);
+    barra.appendChild(controlesDeEstilo(estiloEdicao, function () { pintarCampo(); campo.focus(); }));
     var cancelar = el('button', 'px-3 py-1.5 rounded-lg text-xs font-semibold text-white/60 hover:text-white hover:bg-white/10', 'Cancelar');
     cancelar.type = 'button';
     cancelar.addEventListener('click', fecharEdicao);
     var salvar = el('button', 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-[#09090e] hover:bg-white/85', 'Salvar');
     salvar.type = 'submit';
-    barra.appendChild(cancelar); barra.appendChild(salvar);
+    // Cancelar e Salvar ficam juntos, à direita (quebram de linha juntos se faltar espaço)
+    var acoes = el('div', 'ml-auto flex items-center gap-2');
+    acoes.appendChild(cancelar); acoes.appendChild(salvar);
+    barra.appendChild(acoes);
     f.appendChild(barra);
 
     campo.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fecharEdicao(); } });
@@ -1086,7 +1163,7 @@
       e.preventDefault();
       var texto = campo.value.trim();
       if (!texto) { tremer(campo); return; }
-      enviar(urlCom(URLS.editar, id), { texto: texto, cor: corAtual })
+      enviar(urlCom(URLS.editar, id), Object.assign({ texto: texto, cor: corAtual }, estiloEdicao))
         .then(function (d) { editando = null; mudou(d); focarLinha(id); })
         .catch(function (err) {
           toast(err.message, 'erro');
@@ -1176,7 +1253,7 @@
       var caixa = el('input', 'mt-3 w-4 h-4 shrink-0 accent-[#E94920]');
       caixa.type = 'checkbox'; caixa.checked = true; caixa.value = a.id;
       rotulo.appendChild(caixa);
-      rotulo.appendChild(el('span', 'neon neon-' + a.cor + ' font-quadro text-2xl leading-tight break-words min-w-0', a.texto));
+      rotulo.appendChild(el('span', 'neon neon-' + a.cor + ' ' + ao.classesTexto(a) + ' base-dialogo leading-tight break-words min-w-0', a.texto));
       linhasAvisar.appendChild(rotulo);
     });
     var tracos = estado.tracos.map(function (id) { return cacheTracos[id]; }).filter(Boolean);
