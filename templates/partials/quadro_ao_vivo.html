@@ -21,61 +21,33 @@
   .traco-nucleo { stroke: var(--neon); stroke: color-mix(in oklab, var(--neon) 62%, white); stroke-width: 30px; }
   .traco-vivo-brilho { stroke: var(--neon); stroke-width: 90px; opacity: .22; }
 
-  /* Moldura neon laranja: borda acesa, dois cometas de luz girando, brilho que "respira" e cantos de mira.
-     Só anima transform e opacity, para poder ficar aberta o dia inteiro sem pesar no computador. */
+  /* Moldura neon laranja. Parada por padrão; só se mexe quando isso informa algo:
+     .neon-pulso   -> brilha uma vez (alguém mudou o quadro / chegou um aviso)
+     .neon-apagada -> desbota enquanto a conexão com o servidor está caída */
   .neon-moldura { --raio: 30px; position: relative; isolation: isolate; border-radius: var(--raio); }
   .neon-moldura__aura {
     position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none;
-    box-shadow: 0 0 12px 1px rgba(255,110,30,.8), 0 0 42px 6px rgba(255,90,10,.38), 0 0 110px 12px rgba(255,80,0,.16);
-    animation: neon-ligar 1.6s linear both, neon-respirar 3.4s ease-in-out 1.6s infinite;
+    box-shadow: 0 0 8px rgba(255,110,30,.55), 0 0 26px 2px rgba(255,90,10,.2);
+    transition: opacity .8s ease;
   }
-  .neon-moldura--compacta .neon-moldura__aura {
-    box-shadow: 0 0 10px 1px rgba(255,110,30,.8), 0 0 22px 2px rgba(255,90,10,.35);
-  }
-  /* O rastro desfocado dos cometas some aos poucos para fora da moldura (sem borda dura) */
-  .neon-moldura__cometas {
-    position: absolute; inset: -16px; z-index: 0; border-radius: calc(var(--raio) + 16px);
-    overflow: hidden; pointer-events: none; opacity: .85; animation: neon-ligar 1.6s linear both;
-    -webkit-mask: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent),
-                  linear-gradient(180deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
-    -webkit-mask-composite: source-in;
-    mask: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent),
-          linear-gradient(180deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
-    mask-composite: intersect;
+  .neon-moldura__aura::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; opacity: 0;
+    box-shadow: 0 0 14px 2px rgba(255,140,60,.8), 0 0 46px 8px rgba(255,100,20,.3);
   }
   .neon-moldura__borda {
-    position: relative; z-index: 1; border-radius: inherit; padding: 3px; overflow: hidden;
-    background: linear-gradient(135deg, #ff4800, #ff8c3a 28%, #ff5a10 52%, #ffa35c 78%, #ff4800);
+    position: relative; z-index: 1; border-radius: inherit; padding: 2px; overflow: hidden;
+    background: linear-gradient(135deg, #ff5a10, #ff9a52 50%, #ff5a10);
   }
   .neon-moldura__borda > * { position: relative; z-index: 1; }
-  .neon-moldura__cometas::before, .neon-moldura__borda::before {
-    content: ''; position: absolute; left: 50%; top: 50%; width: 170%; aspect-ratio: 1; translate: -50% -50%;
-    background: conic-gradient(transparent 0 22%, #ff6a0d 43%, #fff3e3 49.4%, transparent 50%,
-                               transparent 72%, #ff6a0d 93%, #fff3e3 99.4%, transparent 100%);
-    animation: neon-girar 5s linear infinite;
-  }
-  .neon-moldura__cometas::before { filter: blur(9px); }
-  .neon-moldura::after {
-    content: ''; position: absolute; inset: -11px; z-index: 2; pointer-events: none;
-    --c: #ffb47c; --l: 26px; --e: 2px;
-    background:
-      linear-gradient(var(--c) 0 0) 0 0 / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) 0 0 / var(--e) var(--l) no-repeat,
-      linear-gradient(var(--c) 0 0) 100% 0 / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) 100% 0 / var(--e) var(--l) no-repeat,
-      linear-gradient(var(--c) 0 0) 0 100% / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) 0 100% / var(--e) var(--l) no-repeat,
-      linear-gradient(var(--c) 0 0) 100% 100% / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) 100% 100% / var(--e) var(--l) no-repeat;
-    filter: drop-shadow(0 0 3px #ff6a1a) drop-shadow(0 0 8px rgba(255,106,26,.6));
-    animation: neon-mira 2.8s ease-in-out infinite;
-  }
-  @keyframes neon-girar { to { rotate: 1turn; } }
-  @keyframes neon-respirar { 50% { opacity: .5; } }
-  @keyframes neon-mira { 0%, 100% { opacity: .95; } 50% { opacity: .3; } }
-  @keyframes neon-ligar { 0% { opacity: 0; } 8% { opacity: .9; } 11% { opacity: .1; } 19% { opacity: 1; } 22% { opacity: .3; } 30%, 100% { opacity: 1; } }
+  .neon-pulso .neon-moldura__aura::after { animation: neon-pulso 1.6s ease-out; }
+  @keyframes neon-pulso { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+  .neon-apagada .neon-moldura__borda { background: linear-gradient(135deg, #4d4540, #6b625c 50%, #4d4540); }
+  .neon-apagada .neon-moldura__aura { opacity: .15; }
 
-  @keyframes pulso-aviso { 0% { box-shadow: 0 0 0 0 rgba(233,73,32,.65); } 100% { box-shadow: 0 0 0 14px rgba(233,73,32,0); } }
-  .pulso-aviso { animation: pulso-aviso 1.2s ease-out infinite; }
+  @keyframes pulso-aviso { 0% { box-shadow: 0 0 0 0 rgba(233,73,32,.5); } 100% { box-shadow: 0 0 0 12px rgba(233,73,32,0); } }
+  .pulso-aviso { animation: pulso-aviso 1.8s ease-out infinite; }
   @media (prefers-reduced-motion: reduce) {
-    .neon-moldura__aura, .neon-moldura__cometas, .neon-moldura__cometas::before, .neon-moldura__borda::before,
-    .neon-moldura::after, .pulso-aviso { animation: none; }
+    .neon-pulso .neon-moldura__aura::after, .pulso-aviso { animation: none; }
   }
 </style>
 
@@ -88,11 +60,10 @@
 
 <dialog id="alerta-quadro" aria-labelledby="alerta-quadro-titulo" aria-describedby="alerta-quadro-linhas"
         class="p-6 bg-transparent w-full max-w-[40rem] backdrop:bg-black/75 backdrop:backdrop-blur-sm">
-  <div class="neon-moldura neon-moldura--compacta" style="--raio: 28px">
+  <div class="neon-moldura" data-alerta-moldura style="--raio: 28px">
     <span class="neon-moldura__aura" aria-hidden="true"></span>
-    <span class="neon-moldura__cometas" aria-hidden="true"></span>
     <div class="neon-moldura__borda">
-      <div class="rounded-[25px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
+      <div class="rounded-[26px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
         <div class="flex items-start gap-3">
           <span class="pulso-aviso w-11 h-11 rounded-2xl bg-[#E94920] text-white flex items-center justify-center shrink-0">
             {% include 'partials/icon.html' with nome='megaphone' classe='w-6 h-6' %}
@@ -136,6 +107,7 @@
   var CHAVE_VISTO = 'quadro.alertaVisto';
   // Compartilhadas entre abas: evita ler o mesmo aviso duas vezes e fecha o aviso em todas ao clicar em "Ciente"
   var CHAVE_FALADO = 'quadro.alertaFalado', CHAVE_CIENTE = 'quadro.alertaCiente', CHAVE_VOZ = 'quadro.lerEmVozAlta';
+  var CHAVE_NOME_VOZ = 'quadro.voz';
 
   function ler(area, chave) { try { return window[area].getItem(chave); } catch (e) { return null; } }
   function gravar(area, chave, valor) { try { window[area].setItem(chave, String(valor)); } catch (e) {} }
@@ -153,15 +125,33 @@
     consultarAgora: function () { consultar(); },
     vozAtiva: function () { return ler('localStorage', CHAVE_VOZ) !== '0'; },
     definirVoz: function (ativa) { gravar('localStorage', CHAVE_VOZ, ativa ? '1' : '0'); },
+    vozes: vozesPortugues,
+    vozEscolhida: vozEscolhida,
+    escolherVoz: function (nome) { gravar('localStorage', CHAVE_NOME_VOZ, nome || ''); },
+    vozNatural: function (v) { return !!v && notaDaVoz(v) <= 2; },
+    aoCarregarVozes: function (fn) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.addEventListener('voiceschanged', fn);
+      fn();
+    },
     testar: function () {
       tocarSinal();
-      setTimeout(function () { falar(['Teste do quadro do NOC.', 'Vila Militar 1/1/1 fora.']); }, 700);
+      setTimeout(function () { falar(['Teste de voz do quadro do NOC.', 'Vila Militar 1/1/1 fora.']); }, 600);
     },
+    pulsar: pulsar,
     formatarHora: formatarHora,
     caminho: caminho,
     criarTraco: criarTraco,
     previa: previa,
   };
+
+  // Faz a moldura neon brilhar uma vez
+  function pulsar(moldura) {
+    if (!moldura) return;
+    moldura.classList.remove('neon-pulso');
+    void moldura.offsetWidth;  // reinicia a animação
+    moldura.classList.add('neon-pulso');
+  }
 
   // ---------- desenho ----------
   // Curva suave passando pelos pontos médios: [x0, y0, x1, y1, ...] -> atributo "d" do SVG
@@ -323,6 +313,7 @@
       if (dialogo.showModal) dialogo.showModal(); else dialogo.setAttribute('open', '');
     }
     dialogo.querySelector('[data-alerta-ciente]').focus();
+    pulsar(dialogo.querySelector('[data-alerta-moldura]'));
 
     tocarSinal();
     // Só uma aba lê em voz alta
@@ -405,38 +396,68 @@
 
   // O texto digitado é lido; o desenho à mão não dá para ler, então só avisa que existe
   function frasesDoAlerta(a) {
-    var frases = ['Atenção, aviso no quadro do NOC.'].concat(a.linhas.map(function (l) { return l.texto; }));
+    var frases = ['Atenção! Novo aviso do NOC.'].concat(a.linhas.map(function (l) { return l.texto; }));
     if (a.tracos && a.tracos.length) {
-      frases.push(a.linhas.length ? 'Há também um desenho no quadro.' : 'Há um desenho no quadro. Confira na tela.');
+      frases.push(a.linhas.length ? 'Tem também um desenho no quadro.' : 'Tem um desenho no quadro. Dá uma olhada na tela.');
     }
     return frases;
   }
 
-  // "1/1/1" seria lido como data ("1 de janeiro..."); no NOC é slot/porta, lido como "1 barra 1 barra 1"
+  // Como a voz deve falar siglas e termos do dia a dia (acrescente aqui o que precisar)
+  var PRONUNCIA = [
+    [/\bNOC\b/gi, 'Nóque'],
+  ];
+
   function paraFala(texto) {
-    return texto
+    var t = String(texto).trim()
+      // "1/1/1" seria lido como data ("1 de janeiro..."); no NOC é slot/porta: "1 barra 1 barra 1"
       .replace(/(\d)\s*\/\s*(?=\d)/g, '$1 barra ')
       .replace(/\s+[-–—]\s+/g, ', ');
+    PRONUNCIA.forEach(function (p) { t = t.replace(p[0], p[1]); });
+    // Ponto final faz a voz fechar a frase com entonação natural, em vez de "pendurar"
+    if (t && !/[.!?…:;,]$/.test(t)) t += '.';
+    return t;
   }
 
-  function vozPortugues() {
-    var vozes = window.speechSynthesis.getVoices();
-    var br = vozes.filter(function (v) { return /^pt[-_]BR/i.test(v.lang); });
-    return br.filter(function (v) { return /natural|online/i.test(v.name); })[0] || br[0]
-      || vozes.filter(function (v) { return /^pt/i.test(v.lang); })[0] || null;
+  // Vozes do navegador, da mais natural para a mais robótica:
+  // 0-1 "Natural" (neurais, do Edge) · 2 Google (Chrome) · 3 Apple · 4 outras online
+  // 5-6 locais antigas do Windows (Maria, Daniel), as mais robóticas
+  function notaDaVoz(v) {
+    var nome = v.name;
+    if (/natural|neural/i.test(nome)) return /francisca|thalita/i.test(nome) ? 0 : 1;
+    if (/google/i.test(nome)) return 2;
+    if (/luciana|felipe|siri/i.test(nome)) return 3;
+    if (!v.localService) return 4;
+    return /maria/i.test(nome) ? 5 : 6;
+  }
+  function vozesPortugues() {
+    if (!('speechSynthesis' in window)) return [];
+    var todas = window.speechSynthesis.getVoices();
+    var br = todas.filter(function (v) { return /^pt[-_]BR/i.test(v.lang); });
+    if (!br.length) br = todas.filter(function (v) { return /^pt/i.test(v.lang); });
+    return br.sort(function (a, b) { return notaDaVoz(a) - notaDaVoz(b) || a.name.localeCompare(b.name); });
+  }
+  function vozEscolhida() {
+    var vozes = vozesPortugues(), nome = ler('localStorage', CHAVE_NOME_VOZ);
+    return vozes.filter(function (v) { return v.name === nome; })[0] || vozes[0] || null;
   }
   if ('speechSynthesis' in window) window.speechSynthesis.getVoices();  // começa a carregar as vozes
 
-  // Cada linha vira uma fala separada (falas longas são cortadas em alguns navegadores)
+  // Cada frase vira uma fala separada: a pausa entre elas soa natural, e falas longas
+  // são cortadas em alguns navegadores
   function falar(frases, aoBloquear) {
     if (!('speechSynthesis' in window)) return;
-    var sintese = window.speechSynthesis, voz = vozPortugues();
+    var sintese = window.speechSynthesis, voz = vozEscolhida();
     sintese.cancel();
     frases.forEach(function (frase) {
-      var fala = new SpeechSynthesisUtterance(paraFala(frase));
-      fala.lang = 'pt-BR';
+      var texto = paraFala(frase);
+      if (!texto) return;
+      var fala = new SpeechSynthesisUtterance(texto);
+      fala.lang = voz ? voz.lang : 'pt-BR';
       if (voz) fala.voice = voz;
-      fala.rate = 0.95;
+      // Vozes neurais já soam naturais na velocidade normal; as antigas ficam melhores um pouco mais lentas
+      fala.rate = voz && notaDaVoz(voz) <= 3 ? 1 : 0.92;
+      fala.pitch = 1;
       fala.onerror = function (e) {
         if (e.error === 'not-allowed' && aoBloquear) { aoBloquear(); aoBloquear = null; }
       };

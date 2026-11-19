@@ -40,6 +40,12 @@ não é lido. Quem abrir o sistema nos 10 minutos seguintes também recebe. Na l
 
 - Tempo real por consulta periódica (`/plantao/quadro/novidades/`, a cada 5 s em qualquer página e a
   cada 2 s na página do quadro). Não precisa de WebSocket, Redis nem mudança no `entrypoint.sh`.
+- Voz: o quadro escolhe a mais natural do navegador (no **Microsoft Edge**, as vozes "Natural"
+  Francisca/Antônio; no Chrome, "Google português do Brasil"); dá para trocar em "Avisos neste
+  computador". Pronúncias especiais (ex.: NOC → "Nóque") ficam na lista `PRONUNCIA` em
+  `templates/partials/quadro_ao_vivo.html`.
+- A moldura neon só se mexe para informar: brilha uma vez quando outra pessoa altera o quadro e fica
+  cinza enquanto a conexão com o servidor está caída.
 - O navegador só libera som/voz depois que a pessoa clica em algo na página. Se estiver bloqueado,
   o aviso aparece com o botão **Ouvir aviso**. As notificações da área de trabalho (ativadas na página
   do quadro) aparecem mesmo com o navegador minimizado.

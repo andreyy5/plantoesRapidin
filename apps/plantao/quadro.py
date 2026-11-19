@@ -331,8 +331,8 @@ def desenhar(request):
 def apagar_tracos(request):
     agora = timezone.now()
     ids = _ids(_dados(request).get('ids'))
+    apagados = list(_tracos_ativos().filter(id__in=ids).values_list('id', flat=True))
     with transaction.atomic():
-        apagados = list(_tracos_ativos().filter(id__in=ids).values_list('id', flat=True))
         TracoQuadro.objects.filter(id__in=apagados).update(apagado_em=agora, apagado_por=request.user)
         _faxina(agora)
     return _resposta_com_estado(request, tracos_apagados=apagados)
@@ -342,12 +342,12 @@ def apagar_tracos(request):
 @_login_json
 def limpar(request):
     agora = timezone.now()
+    ids = list(_ativas().values_list('id', flat=True))
+    tracos_ids = list(_tracos_ativos().values_list('id', flat=True))
     with transaction.atomic():
-        ids = list(_ativas().values_list('id', flat=True))
         AnotacaoQuadro.objects.filter(id__in=ids).update(
             apagado_em=agora, apagado_por=request.user, atualizado_em=agora
         )
-        tracos_ids = list(_tracos_ativos().values_list('id', flat=True))
         TracoQuadro.objects.filter(id__in=tracos_ids).update(apagado_em=agora, apagado_por=request.user)
     return _resposta_com_estado(request, apagadas=ids, tracos_apagados=tracos_ids)
 
@@ -380,22 +380,23 @@ def avisar(request):
     """
     agora = timezone.now()
     dados = _dados(request)
-    with transaction.atomic():
-        ultimo = AlertaQuadro.objects.select_related('criado_por').first()
-        if ultimo and agora - ultimo.criado_em < INTERVALO_ENTRE_ALERTAS:
-            quem = 'Você' if ultimo.criado_por_id == request.user.id else _nome(ultimo.criado_por)
-            return _erro(f'{quem} acabou de enviar um aviso. Aguarde alguns segundos.', status=429)
+    # Leituras fora de transação: no SQLite, ler e depois gravar dentro da mesma
+    # transação pode dar "database is locked" quando outra requisição grava junto.
+    ultimo = AlertaQuadro.objects.select_related('criado_por').first()
+    if ultimo and agora - ultimo.criado_em < INTERVALO_ENTRE_ALERTAS:
+        quem = 'Você' if ultimo.criado_por_id == request.user.id else _nome(ultimo.criado_por)
+        return _erro(f'{quem} acabou de enviar um aviso. Aguarde alguns segundos.', status=429)
 
-        anotacoes = _ativas()
-        if 'ids' in dados:
-            anotacoes = anotacoes.filter(id__in=_ids(dados['ids']))
-        linhas = [{'texto': a.texto, 'cor': a.cor} for a in anotacoes]
-        desenho = []
-        if dados.get('desenho', True):
-            desenho = [{'cor': t.cor, 'pontos': t.pontos} for t in _tracos_ativos()]
-        if not linhas and not desenho:
-            return _erro('Não há nada no quadro para avisar.')
-        alerta = AlertaQuadro.objects.create(linhas=linhas, tracos=desenho, criado_por=request.user)
+    anotacoes = _ativas()
+    if 'ids' in dados:
+        anotacoes = anotacoes.filter(id__in=_ids(dados['ids']))
+    linhas = [{'texto': a.texto, 'cor': a.cor} for a in anotacoes]
+    desenho = []
+    if dados.get('desenho', True):
+        desenho = [{'cor': t.cor, 'pontos': t.pontos} for t in _tracos_ativos()]
+    if not linhas and not desenho:
+        return _erro('Não há nada no quadro para avisar.')
+    alerta = AlertaQuadro.objects.create(linhas=linhas, tracos=desenho, criado_por=request.user)
 
     outros = [c for c in _conectados(request) if not c['voce']]
     return _resposta_com_estado(request, alerta=_alerta_json(alerta), avisados=len(outros))

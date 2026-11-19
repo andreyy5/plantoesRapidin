@@ -11,13 +11,6 @@
       repeating-linear-gradient(115deg, rgba(255,255,255,.012) 0 2px, transparent 2px 7px),
       #07070c;
   }
-  /* Faixa de luz que varre o quadro de tempos em tempos */
-  .quadro-superficie::after {
-    content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
-    background: linear-gradient(180deg, transparent 0 46%, rgba(255,122,40,.08) 50%, transparent 54% 100%);
-    translate: 0 -60%; animation: quadro-varrer 9s linear infinite;
-  }
-  @keyframes quadro-varrer { 0% { translate: 0 -60%; } 40%, 100% { translate: 0 60%; } }
 
   /* ---------- área proporcional ----------
      Tudo dentro dela é medido em cqw (% da largura do quadro), então texto e desenho
@@ -95,7 +88,7 @@
   .so-expandido { display: none; }
   .quadro-expandido .so-expandido { display: inline-flex; }
 
-  @media (prefers-reduced-motion: reduce) { .linha-nova .neon, .tremer, .quadro-superficie::after { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .linha-nova .neon, .tremer { animation: none; } }
 </style>
 {% endblock %}
 
@@ -156,11 +149,10 @@
     </div>
 
     <div class="quadro-palco">
-      <div class="neon-moldura">
+      <div id="moldura" class="neon-moldura">
         <span class="neon-moldura__aura" aria-hidden="true"></span>
-        <span class="neon-moldura__cometas" aria-hidden="true"></span>
         <div class="neon-moldura__borda">
-          <div class="quadro-superficie rounded-[27px] overflow-hidden flex flex-col">
+          <div class="quadro-superficie rounded-[28px] overflow-hidden flex flex-col">
             <div class="quadro-rolagem overflow-x-auto">
               <div class="quadro-container">
                 <div id="area" class="quadro-area">
@@ -241,6 +233,11 @@
         <input type="checkbox" id="ler-em-voz-alta" class="w-4 h-4 accent-[#E94920]">
         Ler os avisos em voz alta
       </label>
+      <div id="bloco-voz" class="hidden flex-col gap-1">
+        <label for="voz" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Voz</label>
+        <select id="voz" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-[#50443C] bg-white focus:outline-none focus:border-[#E94920] focus:ring-2 focus:ring-[#E94920]/15"></select>
+        <p id="dica-voz" class="hidden text-[11px] text-amber-700 leading-relaxed">As vozes deste navegador soam robóticas. No <strong>Microsoft Edge</strong> há vozes "Natural", bem mais naturais.</p>
+      </div>
       <button type="button" id="testar-voz" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">
         {% include 'partials/icon.html' with nome='volume' classe='w-4 h-4' %}
         Testar som e voz
@@ -403,9 +400,12 @@
   }
   function mudou(d) { ultimaMudanca = Date.now(); aplicar(d); }
 
+  var moldura = document.getElementById('moldura');
   ao.assinar(estado.versao, function (d, inicio) {
     if (inicio < ultimaMudanca) { delete d.quadro; }  // resposta antiga, chegou depois de uma alteração nossa
+    var mudouPorOutros = d.quadro && d.quadro.versao !== estado.versao;
     aplicar(d);
+    if (mudouPorOutros) ao.pulsar(moldura);  // a moldura brilha uma vez quando outra pessoa mexe no quadro
   });
 
   var status = document.getElementById('status');
@@ -419,6 +419,7 @@
     status.querySelector('[data-status-ping]').className = 'absolute inline-flex h-full w-full rounded-full opacity-75 ' + cores[1] + (s === 'sessao' ? '' : ' animate-ping');
     status.querySelector('[data-status-ponto]').className = 'relative inline-flex rounded-full w-2.5 h-2.5 ' + cores[2];
     status.querySelector('[data-status-texto]').textContent = cores[3];
+    moldura.classList.toggle('neon-apagada', s !== 'ok');  // sem conexão, a moldura "apaga"
     if (s === 'sessao') toast('Sua sessão expirou. Recarregue a página e entre de novo.', 'erro');
   };
 
@@ -1024,6 +1025,23 @@
   vozAlta.checked = ao.vozAtiva();
   vozAlta.addEventListener('change', function () { ao.definirVoz(vozAlta.checked); });
   document.getElementById('testar-voz').addEventListener('click', function () { ao.testar(); });
+
+  // Lista as vozes em português deste navegador, da mais natural para a mais robótica
+  var seletorVoz = document.getElementById('voz');
+  ao.aoCarregarVozes(function () {
+    var vozes = ao.vozes(), escolhida = ao.vozEscolhida();
+    document.getElementById('bloco-voz').classList.toggle('hidden', !vozes.length);
+    document.getElementById('bloco-voz').classList.toggle('flex', !!vozes.length);
+    seletorVoz.replaceChildren();
+    vozes.forEach(function (v, i) {
+      var nome = v.name.replace(/^Microsoft\s+/i, '').replace(/\s*-\s*Portuguese.*$/i, '').replace(/\s*\(Brazil\)/i, '');
+      var opcao = new Option(nome + (i === 0 ? ' (recomendada)' : ''), v.name);
+      opcao.selected = escolhida && v.name === escolhida.name;
+      seletorVoz.appendChild(opcao);
+    });
+    document.getElementById('dica-voz').classList.toggle('hidden', !vozes.length || ao.vozNatural(vozes[0]));
+  });
+  seletorVoz.addEventListener('change', function () { ao.escolherVoz(seletorVoz.value); ao.testar(); });
 
   var blocoNotif = document.getElementById('notificacoes-sistema');
   var botaoNotif = document.getElementById('ativar-notificacoes');
