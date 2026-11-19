@@ -1,4 +1,4 @@
-{% load static %}{# Quadro do NOC: consulta periódica, contador no menu e aviso em tela + voz. Incluído no base.html para usuários logados. #}
+{% load static %}{# Quadro Rapidin: consulta periódica, contador no menu e aviso em tela + voz. Incluído no base.html para usuários logados. #}
 <style>
   .font-quadro { font-family: 'Caveat', 'Segoe Print', 'Comic Sans MS', cursive; font-weight: 700; }
   /* Texto neon: o brilho é proporcional ao tamanho da letra (em) */
@@ -12,8 +12,9 @@
   }
   .neon.neon-fraco { text-shadow: 0 0 .05em var(--neon), 0 0 .3em var(--neon), 0 0 .6em color-mix(in oklab, var(--neon) 60%, transparent); }
   .neon::placeholder { color: rgba(255,255,255,.28); text-shadow: none; }
-  .neon-rosa { --neon: #ff4fd8; } .neon-ciano { --neon: #2ee6ff; } .neon-verde { --neon: #4dff8f; }
-  .neon-amarelo { --neon: #fff35c; } .neon-laranja { --neon: #ff8a4c; } .neon-roxo { --neon: #bd8cff; }
+  .neon-vermelho { --neon: #ff4d4d; } .neon-laranja { --neon: #ff8a4c; } .neon-amarelo { --neon: #fff35c; }
+  .neon-verde { --neon: #4dff8f; } .neon-ciano { --neon: #2ee6ff; } .neon-azul { --neon: #5c8dff; }
+  .neon-roxo { --neon: #bd8cff; } .neon-rosa { --neon: #ff4fd8; } .neon-branco { --neon: #ecebff; }
 
   /* Traços desenhados à mão (SVG; 1 unidade = 1/10000 da largura do quadro) */
   .traco { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -46,6 +47,9 @@
 
   @keyframes pulso-aviso { 0% { box-shadow: 0 0 0 0 rgba(233,73,32,.5); } 100% { box-shadow: 0 0 0 12px rgba(233,73,32,0); } }
   .pulso-aviso { animation: pulso-aviso 1.8s ease-out infinite; }
+  /* Tempo que o aviso fica na tela: a barra encolhe e, quando acaba, o aviso fecha sozinho */
+  @keyframes alerta-tempo { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  .alerta-tempo { transform-origin: left; animation: alerta-tempo var(--duracao, 30s) linear forwards; }
   @media (prefers-reduced-motion: reduce) {
     .neon-pulso .neon-moldura__aura::after, .pulso-aviso { animation: none; }
   }
@@ -60,38 +64,42 @@
 
 <dialog id="alerta-quadro" aria-labelledby="alerta-quadro-titulo" aria-describedby="alerta-quadro-linhas"
         class="p-6 bg-transparent w-full max-w-[40rem] backdrop:bg-black/75 backdrop:backdrop-blur-sm">
-  <div class="neon-moldura" data-alerta-moldura style="--raio: 28px">
+  <div class="neon-moldura outline-none" data-alerta-moldura tabindex="-1" style="--raio: 28px">
     <span class="neon-moldura__aura" aria-hidden="true"></span>
     <div class="neon-moldura__borda">
-      <div class="rounded-[26px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
+      <div class="relative overflow-hidden rounded-[26px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
         <div class="flex items-start gap-3">
           <span class="pulso-aviso w-11 h-11 rounded-2xl bg-[#E94920] text-white flex items-center justify-center shrink-0">
             {% include 'partials/icon.html' with nome='megaphone' classe='w-6 h-6' %}
           </span>
-          <div class="min-w-0">
-            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300/90">Aviso do NOC</p>
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300/90">Quadro Rapidin</p>
             <h2 id="alerta-quadro-titulo" class="text-lg font-bold text-white leading-tight">Atenção ao quadro</h2>
             <p class="text-xs text-gray-400 mt-0.5" data-alerta-meta></p>
           </div>
+          <button type="button" data-alerta-fechar class="-mr-2 -mt-1 p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/10 transition-colors" aria-label="Fechar aviso">
+            {% include 'partials/icon.html' with nome='x' classe='w-5 h-5' %}
+          </button>
         </div>
         <ul id="alerta-quadro-linhas" class="mt-5 flex flex-col gap-1"></ul>
         <div data-alerta-desenho class="hidden mt-4 rounded-2xl bg-black/40 ring-1 ring-white/10 p-2"></div>
         <p data-alerta-dica-voz class="hidden mt-4 px-3 py-2 rounded-xl bg-amber-400/10 text-amber-200 text-xs font-medium">
           O navegador bloqueou a leitura automática. Clique em <strong>Ouvir aviso</strong> para escutar.
         </p>
-        <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
+        <div class="mt-6 flex flex-wrap items-center gap-2">
+          <p class="mr-auto text-[11px] text-gray-500" data-alerta-tempo-texto>Fecha sozinho em 30 segundos</p>
           <button type="button" data-alerta-ouvir class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
             {% include 'partials/icon.html' with nome='volume' classe='w-4 h-4' %}
             <span data-alerta-ouvir-texto>Ouvir de novo</span>
           </button>
-          <a href="{% url 'quadro' %}" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+          <a href="{% url 'quadro' %}" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors">
             {% include 'partials/icon.html' with nome='board' classe='w-4 h-4' %}
             Abrir quadro
           </a>
-          <button type="button" data-alerta-ciente class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-lg shadow-[#E94920]/30">
-            Ciente
-          </button>
         </div>
+        <span class="absolute left-0 right-0 bottom-0 h-[3px] bg-white/5" aria-hidden="true">
+          <span data-alerta-tempo class="block h-full bg-gradient-to-r from-[#E94920] to-[#ff9a52]"></span>
+        </span>
       </div>
     </div>
   </div>
@@ -105,9 +113,11 @@
   var LARGURA = 10000;  // unidades do desenho por largura do quadro
   // Por aba (sobrevive à troca de página): último aviso que esta aba já viu
   var CHAVE_VISTO = 'quadro.alertaVisto';
-  // Compartilhadas entre abas: evita ler o mesmo aviso duas vezes e fecha o aviso em todas ao clicar em "Ciente"
-  var CHAVE_FALADO = 'quadro.alertaFalado', CHAVE_CIENTE = 'quadro.alertaCiente', CHAVE_VOZ = 'quadro.lerEmVozAlta';
+  // Compartilhadas entre abas: evita ler o mesmo aviso duas vezes e fecha o aviso em todas as abas juntas
+  var CHAVE_FALADO = 'quadro.alertaFalado', CHAVE_FECHADO = 'quadro.alertaFechado', CHAVE_VOZ = 'quadro.lerEmVozAlta';
   var CHAVE_NOME_VOZ = 'quadro.voz';
+  var SEGUNDOS_NA_TELA = 30;  // o aviso fecha sozinho depois disso
+  var VEZES_LEITURA = 2;      // o aviso é lido duas vezes
 
   function ler(area, chave) { try { return window[area].getItem(chave); } catch (e) { return null; } }
   function gravar(area, chave, valor) { try { window[area].setItem(chave, String(valor)); } catch (e) {} }
@@ -136,7 +146,7 @@
     },
     testar: function () {
       tocarSinal();
-      setTimeout(function () { falar(['Teste de voz do quadro do NOC.', 'Vila Militar 1/1/1 fora.']); }, 600);
+      setTimeout(function () { falar(['Teste de voz do Quadro Rapidin.', 'Vila Militar 1/1/1 fora.']); }, 600);
     },
     pulsar: pulsar,
     formatarHora: formatarHora,
@@ -154,10 +164,15 @@
   }
 
   // ---------- desenho ----------
-  // Curva suave passando pelos pontos médios: [x0, y0, x1, y1, ...] -> atributo "d" do SVG
-  function caminho(p) {
+  // [x0, y0, x1, y1, ...] -> atributo "d" do SVG.
+  // Caneta livre: curva suave pelos pontos médios. Formas (linha, seta, retângulo, círculo): segmentos retos.
+  function caminho(p, forma) {
     var n = p.length / 2;
     var d = 'M' + p[0] + ' ' + p[1];
+    if (forma && forma !== 'livre') {
+      for (var j = 1; j < n; j++) d += 'L' + p[2 * j] + ' ' + p[2 * j + 1];
+      return d;
+    }
     if (n < 3) return d + 'L' + p[n * 2 - 2] + ' ' + p[n * 2 - 1];
     for (var i = 1; i < n - 1; i++) {
       d += 'Q' + p[2 * i] + ' ' + p[2 * i + 1] + ' ' + (p[2 * i] + p[2 * i + 2]) / 2 + ' ' + (p[2 * i + 1] + p[2 * i + 3]) / 2;
@@ -165,10 +180,10 @@
     return d + 'L' + p[2 * n - 2] + ' ' + p[2 * n - 1];
   }
 
-  function criarTraco(cor, pontos, classe) {
+  function criarTraco(cor, pontos, classe, forma) {
     var el = document.createElementNS(SVG_NS, 'path');
     el.setAttribute('class', 'traco ' + classe + ' neon-' + cor);
-    el.setAttribute('d', caminho(pontos));
+    el.setAttribute('d', caminho(pontos, forma));
     return el;
   }
 
@@ -193,8 +208,8 @@
     var brilho = document.createElementNS(SVG_NS, 'g'), nucleo = document.createElementNS(SVG_NS, 'g');
     brilho.setAttribute('filter', 'url(#quadro-brilho)');
     tracos.forEach(function (t) {
-      brilho.appendChild(criarTraco(t.cor, t.pontos, 'traco-brilho'));
-      nucleo.appendChild(criarTraco(t.cor, t.pontos, 'traco-nucleo'));
+      brilho.appendChild(criarTraco(t.cor, t.pontos, 'traco-brilho', t.forma));
+      nucleo.appendChild(criarTraco(t.cor, t.pontos, 'traco-nucleo', t.forma));
     });
     svg.appendChild(brilho); svg.appendChild(nucleo);
     return svg;
@@ -292,8 +307,24 @@
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + hm;
   }
 
+  var barraTempo = dialogo.querySelector('[data-alerta-tempo]');
+  var painelAlerta = dialogo.querySelector('[data-alerta-moldura]');
+
+  // A barra encolhe em SEGUNDOS_NA_TELA; quando termina, o aviso fecha. Com a aba escondida o
+  // tempo para, para ninguém perder o aviso por estar em outro programa.
+  function iniciarTempo() {
+    barraTempo.classList.remove('alerta-tempo');
+    void barraTempo.offsetWidth;  // reinicia a animação
+    barraTempo.style.setProperty('--duracao', SEGUNDOS_NA_TELA + 's');
+    barraTempo.classList.add('alerta-tempo');
+    pausarTempoSeEscondida();
+  }
+  function pausarTempoSeEscondida() { barraTempo.style.animationPlayState = document.hidden ? 'paused' : 'running'; }
+  document.addEventListener('visibilitychange', pausarTempoSeEscondida);
+  barraTempo.addEventListener('animationend', function () { fecharAlerta({ outrasAbas: true }); });
+
   function mostrarAlerta(a) {
-    if (numero(ler('localStorage', CHAVE_CIENTE)) >= a.id) return;  // já confirmado em outra aba
+    if (numero(ler('localStorage', CHAVE_FECHADO)) >= a.id) return;  // já fechado em outra aba
     alertaAtual = a;
     meta.textContent = 'Enviado por ' + a.autor + ' às ' + formatarHora(a.criado_em);
     listaAlerta.replaceChildren();
@@ -312,38 +343,44 @@
     if (!dialogo.open) {
       if (dialogo.showModal) dialogo.showModal(); else dialogo.setAttribute('open', '');
     }
-    dialogo.querySelector('[data-alerta-ciente]').focus();
-    pulsar(dialogo.querySelector('[data-alerta-moldura]'));
+    // Foco no painel (e não num botão): quem estava digitando não fecha o aviso sem querer
+    painelAlerta.focus({ preventScroll: true });
+    pulsar(painelAlerta);
+    iniciarTempo();
 
     tocarSinal();
     // Só uma aba lê em voz alta
     if (api.vozAtiva() && numero(ler('localStorage', CHAVE_FALADO)) < a.id) {
       gravar('localStorage', CHAVE_FALADO, a.id);
-      setTimeout(function () { falar(frasesDoAlerta(a), vozBloqueada); }, 700);
+      setTimeout(function () { lerAlerta(a, VEZES_LEITURA); }, 700);
     }
     notificarSistema(a);
     piscarTitulo();
   }
 
-  function fecharAlerta(avisarOutrasAbas) {
+  // opcoes.outrasAbas: fecha também nas outras abas; opcoes.calar: interrompe a leitura
+  // (ao fechar pelo X ou Esc). Quando fecha sozinho, a leitura termina normalmente.
+  function fecharAlerta(opcoes) {
     if (!alertaAtual) return;
-    if (avisarOutrasAbas) gravar('localStorage', CHAVE_CIENTE, alertaAtual.id);
+    if (opcoes.outrasAbas) gravar('localStorage', CHAVE_FECHADO, alertaAtual.id + (opcoes.calar ? ':calar' : ''));
     alertaAtual = null;
-    pararDeFalar();
+    if (opcoes.calar) pararDeFalar();
     pararPiscar();
+    barraTempo.classList.remove('alerta-tempo');
     if (dialogo.open) { if (dialogo.close) dialogo.close(); else dialogo.removeAttribute('open'); }
   }
 
-  dialogo.querySelector('[data-alerta-ciente]').addEventListener('click', function () { fecharAlerta(true); });
-  dialogo.addEventListener('cancel', function (e) { e.preventDefault(); fecharAlerta(true); });  // Esc
+  dialogo.querySelector('[data-alerta-fechar]').addEventListener('click', function () { fecharAlerta({ outrasAbas: true, calar: true }); });
+  dialogo.addEventListener('cancel', function (e) { e.preventDefault(); fecharAlerta({ outrasAbas: true, calar: true }); });  // Esc
   botaoOuvir.addEventListener('click', function () {
     if (!alertaAtual) return;
     dicaVoz.classList.add('hidden');
     textoOuvir.textContent = 'Ouvir de novo';
-    falar(frasesDoAlerta(alertaAtual), vozBloqueada);
+    lerAlerta(alertaAtual, 1);
   });
   window.addEventListener('storage', function (e) {
-    if (e.key === CHAVE_CIENTE && alertaAtual && numero(e.newValue) >= alertaAtual.id) fecharAlerta(false);
+    if (e.key !== CHAVE_FECHADO || !alertaAtual || numero(e.newValue) < alertaAtual.id) return;
+    fecharAlerta({ calar: /:calar$/.test(e.newValue || '') });
   });
 
   function vozBloqueada() {
@@ -357,7 +394,7 @@
     var ligado = false;
     piscando = setInterval(function () {
       ligado = !ligado;
-      document.title = ligado ? '(!) Aviso do NOC' : tituloOriginal;
+      document.title = ligado ? '(!) Aviso no Quadro Rapidin' : tituloOriginal;
     }, 1000);
   }
   function pararPiscar() { if (piscando) clearInterval(piscando); piscando = null; document.title = tituloOriginal; }
@@ -367,10 +404,9 @@
     try {
       var texto = a.linhas.map(function (l) { return l.texto; }).join('\n');
       if (a.tracos && a.tracos.length) texto = texto ? texto + '\n(+ desenho no quadro)' : 'Desenho no quadro';
-      var n = new Notification('Aviso do NOC', {
-        body: texto, tag: 'quadro-noc-' + a.id, icon: ICONE, requireInteraction: true,
-      });
+      var n = new Notification('Quadro Rapidin', { body: texto, tag: 'quadro-rapidin-' + a.id, icon: ICONE });
       n.onclick = function () { window.focus(); n.close(); };
+      setTimeout(function () { n.close(); }, SEGUNDOS_NA_TELA * 1000);
     } catch (e) {}
   }
 
@@ -395,17 +431,31 @@
   }
 
   // O texto digitado é lido; o desenho à mão não dá para ler, então só avisa que existe
-  function frasesDoAlerta(a) {
-    var frases = ['Atenção! Novo aviso do NOC.'].concat(a.linhas.map(function (l) { return l.texto; }));
+  function corpoDoAlerta(a) {
+    var frases = a.linhas.map(function (l) { return l.texto; });
     if (a.tracos && a.tracos.length) {
       frases.push(a.linhas.length ? 'Tem também um desenho no quadro.' : 'Tem um desenho no quadro. Dá uma olhada na tela.');
     }
     return frases;
   }
 
-  // Como a voz deve falar siglas e termos do dia a dia (acrescente aqui o que precisar)
+  // Lê o aviso `vezes` vezes, com uma pausa entre as leituras
+  function lerAlerta(a, vezes) {
+    var corpo = corpoDoAlerta(a), rodada = 0;
+    function proxima() {
+      rodada++;
+      var abertura = rodada === 1 ? 'Atenção! Novo aviso no Quadro Rapidin.' : 'Repetindo.';
+      var minha = falar([abertura].concat(corpo), vozBloqueada, rodada < vezes ? function () {
+        setTimeout(function () { if (minha === geracaoFala) proxima(); }, 1200);
+      } : null);
+    }
+    proxima();
+  }
+
+  // Como a voz deve falar siglas e nomes (acrescente aqui o que precisar)
   var PRONUNCIA = [
     [/\bNOC\b/gi, 'Nóque'],
+    [/\bRapidin\b/gi, 'Rapidim'],
   ];
 
   function paraFala(texto) {
@@ -444,14 +494,16 @@
   if ('speechSynthesis' in window) window.speechSynthesis.getVoices();  // começa a carregar as vozes
 
   // Cada frase vira uma fala separada: a pausa entre elas soa natural, e falas longas
-  // são cortadas em alguns navegadores
-  function falar(frases, aoBloquear) {
-    if (!('speechSynthesis' in window)) return;
+  // são cortadas em alguns navegadores. `aoTerminar` roda quando a última frase acaba.
+  var geracaoFala = 0, falasAtivas = [];
+  function falar(frases, aoBloquear, aoTerminar) {
+    var minha = ++geracaoFala;
+    if (!('speechSynthesis' in window)) return minha;
     var sintese = window.speechSynthesis, voz = vozEscolhida();
     sintese.cancel();
-    frases.forEach(function (frase) {
-      var texto = paraFala(frase);
-      if (!texto) return;
+    var textos = frases.map(paraFala).filter(Boolean);
+    // Guarda as falas: o Chrome perde o "terminou" de falas que o coletor de lixo recolhe
+    falasAtivas = textos.map(function (texto, i) {
       var fala = new SpeechSynthesisUtterance(texto);
       fala.lang = voz ? voz.lang : 'pt-BR';
       if (voz) fala.voice = voz;
@@ -461,9 +513,17 @@
       fala.onerror = function (e) {
         if (e.error === 'not-allowed' && aoBloquear) { aoBloquear(); aoBloquear = null; }
       };
+      if (i === textos.length - 1 && aoTerminar) {
+        fala.onend = function () { if (minha === geracaoFala) aoTerminar(); };
+      }
       sintese.speak(fala);
+      return fala;
     });
+    return minha;
   }
-  function pararDeFalar() { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); }
+  function pararDeFalar() {
+    geracaoFala++;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }
 })();
 </script>

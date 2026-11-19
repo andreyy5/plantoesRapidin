@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Quadro do NOC - Rapidin Plantões{% endblock %}
+{% block title %}Quadro Rapidin - Rapidin Plantões{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -17,7 +17,7 @@
      ficam no mesmo lugar em qualquer tamanho de tela, inclusive no modo expandido. */
   .quadro-container { container-type: inline-size; min-width: 560px; }
   .quadro-area { position: relative; min-height: 56.25cqw; }
-  .modo-caneta .quadro-area, .modo-apagador .quadro-area { -webkit-user-select: none; user-select: none; }
+  .modo-desenho .quadro-area, .modo-apagador .quadro-area { -webkit-user-select: none; user-select: none; }
   .quadro-linhas { position: relative; display: flex; flex-direction: column; gap: .35cqw; padding: 2.4cqw 3cqw 2cqw; }
   .linha { position: relative; border-radius: 1.2cqw; padding: .15cqw 1cqw; transition: background-color .15s; }
   .linha:hover { background: rgba(255,255,255,.035); }
@@ -26,7 +26,7 @@
   .linha-acoes { position: absolute; top: .45cqw; right: .6cqw; display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity .15s; }
   .linha:hover .linha-acoes, .linha:focus-within .linha-acoes { opacity: 1; }
   @media (hover: none) { .linha-acoes { opacity: 1; } .linha-meta { display: none; } }
-  .modo-caneta .linha-acoes, .modo-apagador .linha-acoes { visibility: hidden; }
+  .modo-desenho .linha-acoes, .modo-apagador .linha-acoes { visibility: hidden; }
   .quadro-vazio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 8cqw; pointer-events: none; }
   .quadro-vazio[hidden] { display: none; }
   .quadro-vazio-titulo { font-size: 5cqw; }
@@ -34,8 +34,8 @@
 
   /* ---------- desenho ---------- */
   .quadro-desenho { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-  .modo-caneta .quadro-desenho, .modo-apagador .quadro-desenho { pointer-events: auto; touch-action: none; }
-  .modo-caneta .quadro-desenho { cursor: crosshair; }
+  .modo-desenho .quadro-desenho, .modo-apagador .quadro-desenho { pointer-events: auto; touch-action: none; }
+  .modo-desenho .quadro-desenho { cursor: crosshair; }
   .modo-apagador .quadro-desenho {
     cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='14' r='11' fill='rgba(255,255,255,.15)' stroke='white' stroke-width='2'/%3E%3C/svg%3E") 14 14, cell;
   }
@@ -57,9 +57,9 @@
   }
   input:checked + .caneta-corpo { transform: translateY(-5px); box-shadow: 0 0 14px var(--neon), 0 0 3px var(--neon), inset 0 1px 0 rgba(255,255,255,.25); }
   input:focus-visible + .caneta-corpo { outline: 2px solid #fff; outline-offset: 4px; }
-  .caneta-corpo { width: 48px; }
-  .quadro-expandido .caneta-corpo { width: 58px; }
-  @media (max-width: 639px) { .caneta-corpo { width: 44px; } }
+  .caneta-corpo { width: 40px; }
+  .quadro-expandido .caneta-corpo { width: 54px; }
+  @media (max-width: 639px) { .caneta-corpo { width: 36px; } }
 
   /* ---------- linha nova: aparece como se estivesse sendo escrita ---------- */
   @keyframes escrevendo { from { clip-path: inset(-1em 100% -1em -1em); } to { clip-path: inset(-1em -1em -1em -1em); } }
@@ -97,7 +97,7 @@
 
 <!-- Cabeçalho -->
 <div>
-  <h1 class="text-xl font-bold text-[#50443C]">Quadro do NOC</h1>
+  <h1 class="text-xl font-bold text-[#50443C]">Quadro Rapidin</h1>
   <p class="text-xs text-gray-400 font-medium mt-1">Escreva ou desenhe: tudo aparece na hora para todos. Use <strong class="text-gray-500">Avisar</strong> para chamar quem está conectado.</p>
 </div>
 
@@ -111,21 +111,16 @@
     <div class="flex items-center gap-2 flex-wrap">
       <span class="so-expandido items-center gap-2 mr-2 text-white font-bold">
         {% include 'partials/icon.html' with nome='board' classe='w-5 h-5 text-orange-400' %}
-        Quadro do NOC
+        Quadro Rapidin
       </span>
-      <div role="group" aria-label="Ferramenta" class="inline-flex p-1 rounded-xl bg-white border border-gray-200/80 shadow-sm">
-        <button type="button" data-ferramenta="texto" aria-pressed="true" title="Digitar no quadro"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 hover:text-[#50443C] transition-colors aria-pressed:bg-[#E94920] aria-pressed:text-white aria-pressed:shadow-sm">
-          {% include 'partials/icon.html' with nome='type' classe='w-4 h-4' %}<span class="hidden sm:inline">Texto</span><span class="sr-only sm:hidden">Texto</span>
+      <div role="group" aria-label="Ferramenta" class="inline-flex items-center gap-0.5 p-1 rounded-xl bg-white border border-gray-200/80 shadow-sm">
+        {% for valor, rotulo, dica, icone in ferramentas %}
+        {% if valor == 'caneta' or valor == 'apagador' %}<span class="w-px h-5 mx-0.5 bg-gray-200" aria-hidden="true"></span>{% endif %}
+        <button type="button" data-ferramenta="{{ valor }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}" title="{{ dica }}" aria-label="{{ rotulo }}"
+                class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-[#50443C] hover:bg-gray-100 transition-colors aria-pressed:bg-[#E94920] aria-pressed:text-white aria-pressed:shadow-sm aria-pressed:hover:bg-[#E94920]">
+          {% include 'partials/icon.html' with nome=icone classe='w-[18px] h-[18px]' %}
         </button>
-        <button type="button" data-ferramenta="caneta" aria-pressed="false" title="Escrever e desenhar com o mouse"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 hover:text-[#50443C] transition-colors aria-pressed:bg-[#E94920] aria-pressed:text-white aria-pressed:shadow-sm">
-          {% include 'partials/icon.html' with nome='pen' classe='w-4 h-4' %}<span class="hidden sm:inline">Caneta</span><span class="sr-only sm:hidden">Caneta</span>
-        </button>
-        <button type="button" data-ferramenta="apagador" aria-pressed="false" title="Apagar traços do desenho"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 hover:text-[#50443C] transition-colors aria-pressed:bg-[#E94920] aria-pressed:text-white aria-pressed:shadow-sm">
-          {% include 'partials/icon.html' with nome='eraser' classe='w-4 h-4' %}<span class="hidden sm:inline">Apagador</span><span class="sr-only sm:hidden">Apagador</span>
-        </button>
+        {% endfor %}
       </div>
       <span class="flex-1"></span>
       <span id="status" class="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-gray-200/80 text-xs font-bold text-emerald-700" role="status">
@@ -159,7 +154,7 @@
                   <ul id="linhas" class="quadro-linhas" aria-label="Linhas do quadro"></ul>
                   <div id="vazio" class="quadro-vazio" hidden>
                     <p class="neon neon-laranja font-quadro quadro-vazio-titulo opacity-75">Quadro limpo</p>
-                    <p class="quadro-vazio-texto mt-2 text-white/45">Digite abaixo ou pegue a <span class="text-white/75">Caneta</span> para escrever com o mouse.</p>
+                    <p class="quadro-vazio-texto mt-2 text-white/45">Digite abaixo ou use a <span class="text-white/75">Caneta</span> e as formas para desenhar.</p>
                   </div>
                   <svg id="desenho" class="quadro-desenho" role="img" aria-label="Desenhos do quadro">
                     <g id="g-brilho" filter="url(#quadro-brilho)"></g>
@@ -187,11 +182,11 @@
 
       <!-- Bandeja: cor da caneta, desfazer e limpar -->
       <div class="mx-4 sm:mx-8 flex items-center gap-3 sm:gap-4 px-4 sm:px-5 pt-4 pb-3 rounded-b-2xl bg-gradient-to-b from-[#3a3a44] to-[#25252d] shadow-md">
-        <fieldset class="flex items-center gap-x-3 gap-y-2 sm:gap-4 flex-wrap min-w-0">
+        <fieldset class="flex items-center gap-x-2.5 gap-y-2 sm:gap-x-3 flex-wrap min-w-0">
           <legend class="sr-only">Cor da caneta</legend>
           {% for valor, rotulo in cores %}
           <label class="cursor-pointer py-1 pl-2" title="Caneta {{ rotulo|lower }}">
-            <input type="radio" name="cor" value="{{ valor }}" class="sr-only" {% if forloop.first %}checked{% endif %}>
+            <input type="radio" name="cor" value="{{ valor }}" class="sr-only" {% if valor == 'rosa' %}checked{% endif %}>
             <span class="caneta-corpo neon-{{ valor }}" aria-hidden="true"></span>
             <span class="sr-only">{{ rotulo }}</span>
           </label>
@@ -203,9 +198,9 @@
           {% include 'partials/icon.html' with nome='undo' classe='w-4 h-4' %}
           <span class="sr-only">Desfazer traço</span>
         </button>
-        <button type="button" id="botao-limpar" class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+        <button type="button" id="botao-limpar" title="Limpar o quadro" class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
           {% include 'partials/icon.html' with nome='trash' classe='w-4 h-4' %}
-          <span class="hidden sm:inline">Limpar quadro</span><span class="sr-only sm:hidden">Limpar quadro</span>
+          <span class="sr-only">Limpar quadro</span>
         </button>
       </div>
     </div>
@@ -501,9 +496,9 @@
       if (elementosTraco[id]) return;
       var t = cacheTracos[id];
       if (!t) { faltam.push(id); return; }
-      var brilho = ao.criarTraco(t.cor, t.pontos, 'traco-brilho');
-      var nucleo = ao.criarTraco(t.cor, t.pontos, 'traco-nucleo');
-      var alvo = ao.criarTraco(t.cor, t.pontos, 'traco-alvo');
+      var brilho = ao.criarTraco(t.cor, t.pontos, 'traco-brilho', t.forma);
+      var nucleo = ao.criarTraco(t.cor, t.pontos, 'traco-nucleo', t.forma);
+      var alvo = ao.criarTraco(t.cor, t.pontos, 'traco-alvo', t.forma);
       alvo.dataset.traco = id;
       gBrilho.appendChild(brilho); gNucleo.appendChild(nucleo); gAlvo.appendChild(alvo);
       elementosTraco[id] = [brilho, nucleo, alvo];
@@ -581,15 +576,57 @@
     return saida;
   }
 
-  var vivo = null;       // traço sendo desenhado agora
+  var vivo = null;       // traço ou forma sendo desenhado agora
   var apagando = null;   // ids marcados pelo apagador
   var quadroAgendado = false;
+  var FORMAS = { linha: true, seta: true, retangulo: true, elipse: true };
+  var TAMANHO_MINIMO_FORMA = 60;  // arrastar menos que isso não cria forma (foi só um clique)
 
-  function novoTracoVivo(pontos, pointerId) {
+  function alturaEmUnidades() {
+    var r = area.getBoundingClientRect();
+    return Math.round(r.height * LARGURA / r.width);
+  }
+
+  // Pontos da forma entre o ponto inicial (a) e o atual (b). Com Shift: linha/seta em
+  // ângulos de 45°, retângulo vira quadrado e elipse vira círculo.
+  function pontosDaForma(forma, a, b, restringir) {
+    var x0 = a[0], y0 = a[1], x1 = b[0], y1 = b[1], dx = x1 - x0, dy = y1 - y0, p;
+    if (restringir && (forma === 'linha' || forma === 'seta')) {
+      var passo = Math.PI / 4, ang = Math.round(Math.atan2(dy, dx) / passo) * passo, comp = Math.hypot(dx, dy);
+      x1 = x0 + Math.cos(ang) * comp; y1 = y0 + Math.sin(ang) * comp;
+    } else if (restringir) {
+      var lado = Math.max(Math.abs(dx), Math.abs(dy));
+      x1 = x0 + (dx < 0 ? -lado : lado); y1 = y0 + (dy < 0 ? -lado : lado);
+    }
+    if (forma === 'linha') {
+      p = [x0, y0, x1, y1];
+    } else if (forma === 'seta') {
+      var angulo = Math.atan2(y1 - y0, x1 - x0);
+      var ponta = Math.max(140, Math.min(420, Math.hypot(x1 - x0, y1 - y0) * 0.28));
+      p = [x0, y0, x1, y1,
+           x1 + ponta * Math.cos(angulo + Math.PI - 0.5), y1 + ponta * Math.sin(angulo + Math.PI - 0.5),
+           x1, y1,
+           x1 + ponta * Math.cos(angulo + Math.PI + 0.5), y1 + ponta * Math.sin(angulo + Math.PI + 0.5)];
+    } else if (forma === 'retangulo') {
+      p = [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0];
+    } else {  // elipse
+      var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = Math.abs(x1 - x0) / 2, ry = Math.abs(y1 - y0) / 2;
+      p = [];
+      for (var i = 0; i <= 72; i++) { var t = i / 72 * 2 * Math.PI; p.push(cx + rx * Math.cos(t), cy + ry * Math.sin(t)); }
+    }
+    var alturaMaxima = alturaEmUnidades();
+    return p.map(function (v, i) { return Math.round(Math.max(0, Math.min(i % 2 ? alturaMaxima : LARGURA, v))); });
+  }
+
+  function novoTracoVivo(forma, ponto, e) {
     var cor = corEscolhida();
-    vivo = { cor: cor, pontos: pontos, pointerId: pointerId,
-             brilho: ao.criarTraco(cor, pontos, 'traco-vivo-brilho'), nucleo: ao.criarTraco(cor, pontos, 'traco-nucleo') };
+    vivo = { cor: cor, forma: forma, pontos: ponto.slice(), inicio: ponto, fim: ponto, restringir: e.shiftKey, pointerId: e.pointerId,
+             brilho: ao.criarTraco(cor, ponto, 'traco-vivo-brilho', forma), nucleo: ao.criarTraco(cor, ponto, 'traco-nucleo', forma) };
     gVivo.appendChild(vivo.brilho); gVivo.appendChild(vivo.nucleo);
+  }
+
+  function pontosDoVivo(t) {
+    return t.forma === 'livre' ? t.pontos : pontosDaForma(t.forma, t.inicio, t.fim, t.restringir);
   }
 
   function redesenharVivo() {
@@ -598,7 +635,7 @@
     requestAnimationFrame(function () {
       quadroAgendado = false;
       if (!vivo) return;
-      var d = ao.caminho(vivo.pontos);
+      var d = ao.caminho(pontosDoVivo(vivo), vivo.forma);
       vivo.brilho.setAttribute('d', d); vivo.nucleo.setAttribute('d', d);
     });
   }
@@ -607,20 +644,38 @@
     var t = vivo;
     vivo = null;
     if (!t) return;
-    var pontos = t.pontos, tolerancia = 6;
-    do { pontos = simplificar(t.pontos, tolerancia); tolerancia *= 2; } while (pontos.length > MAX_VALORES_TRACO);
-    if (pontos.length === 2) pontos = pontos.concat(pontos);  // um clique vira um ponto
-    var d = ao.caminho(pontos);
+    var pontos;
+    if (t.forma === 'livre') {
+      var tolerancia = 6;
+      do { pontos = simplificar(t.pontos, tolerancia); tolerancia *= 2; } while (pontos.length > MAX_VALORES_TRACO);
+      if (pontos.length === 2) pontos = pontos.concat(pontos);  // um clique vira um ponto
+    } else {
+      if (Math.hypot(t.fim[0] - t.inicio[0], t.fim[1] - t.inicio[1]) < TAMANHO_MINIMO_FORMA) {
+        t.brilho.remove(); t.nucleo.remove();
+        return;
+      }
+      pontos = pontosDaForma(t.forma, t.inicio, t.fim, t.restringir);
+    }
+    var d = ao.caminho(pontos, t.forma);
     t.brilho.setAttribute('d', d); t.nucleo.setAttribute('d', d);
-    enviar(URLS.desenhar, { cor: t.cor, pontos: pontos })
+    enviar(URLS.desenhar, { cor: t.cor, forma: t.forma, pontos: pontos })
       .then(function (resp) {
-        cacheTracos[resp.id] = { id: resp.id, cor: t.cor, pontos: pontos };
+        cacheTracos[resp.id] = { id: resp.id, cor: t.cor, forma: t.forma, pontos: pontos };
         meusTracos.push(resp.id);
         mudou(resp);
       })
       .catch(function (err) { toast(err.message, 'erro'); })
       .then(function () { t.brilho.remove(); t.nucleo.remove(); });
   }
+
+  // Shift apertado ou solto no meio do arraste muda a forma na hora
+  function atualizarShift(e) {
+    if (!vivo || vivo.forma === 'livre' || e.key !== 'Shift') return;
+    vivo.restringir = e.type === 'keydown';
+    redesenharVivo();
+  }
+  document.addEventListener('keydown', atualizarShift);
+  document.addEventListener('keyup', atualizarShift);
 
   function marcarParaApagar(e) {
     document.elementsFromPoint(e.clientX, e.clientY).forEach(function (alvo) {
@@ -656,13 +711,18 @@
     if (vivo || apagando) return;
     e.preventDefault();
     try { svg.setPointerCapture(e.pointerId); } catch (erro) {}
-    if (ferramenta === 'caneta') { novoTracoVivo(pontoDo(e), e.pointerId); redesenharVivo(); }
-    else { apagando = {}; marcarParaApagar(e); }
+    if (ferramenta === 'apagador') { apagando = {}; marcarParaApagar(e); return; }
+    novoTracoVivo(FORMAS[ferramenta] ? ferramenta : 'livre', pontoDo(e), e);
+    redesenharVivo();
   });
   svg.addEventListener('pointermove', function (e) {
     var eventos = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
     if (!eventos.length) eventos = [e];
-    if (vivo && e.pointerId === vivo.pointerId) {
+    if (vivo && e.pointerId === vivo.pointerId && vivo.forma !== 'livre') {
+      vivo.fim = pontoDo(e);
+      vivo.restringir = e.shiftKey;
+      redesenharVivo();
+    } else if (vivo && e.pointerId === vivo.pointerId) {
       eventos.forEach(function (ev) {
         var p = pontoDo(ev), n = vivo.pontos.length;
         if (Math.hypot(p[0] - vivo.pontos[n - 2], p[1] - vivo.pontos[n - 1]) < 5) return;
@@ -670,9 +730,9 @@
       });
       // Traço muito longo: fecha este e continua em um novo, do mesmo ponto
       if (vivo.pontos.length > MAX_VALORES_TRACO * 3) {
-        var ultimo = vivo.pontos.slice(-2), id = vivo.pointerId;
+        var ultimo = vivo.pontos.slice(-2);
         terminarTraco();
-        novoTracoVivo(ultimo, id);
+        novoTracoVivo('livre', ultimo, e);
       }
       redesenharVivo();
     } else if (apagando) {
@@ -690,8 +750,8 @@
   var botoesFerramenta = document.querySelectorAll('[data-ferramenta]');
   function escolherFerramenta(f) {
     ferramenta = f;
-    secao.classList.remove('modo-texto', 'modo-caneta', 'modo-apagador');
-    secao.classList.add('modo-' + f);
+    secao.classList.remove('modo-texto', 'modo-desenho', 'modo-apagador');
+    secao.classList.add(f === 'texto' || f === 'apagador' ? 'modo-' + f : 'modo-desenho');
     botoesFerramenta.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.ferramenta === f ? 'true' : 'false'); });
     if (f !== 'texto' && editando !== null) fecharEdicao();
     atualizarDesfazer();

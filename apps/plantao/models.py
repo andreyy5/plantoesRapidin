@@ -499,17 +499,21 @@ from datetime import datetime
 
 class AnotacaoQuadro(models.Model):
     """
-    Uma linha escrita no quadro do NOC (ex.: "Vila Militar 1/1/1 fora").
+    Uma linha escrita no Quadro Rapidin (ex.: "Vila Militar 1/1/1 fora").
     Apagar só marca a linha (apagado_em), para o "Desfazer" funcionar.
     """
 
+    # Na ordem da bandeja de canetas
     CORES = [
-        ('rosa', 'Rosa'),
-        ('ciano', 'Ciano'),
-        ('verde', 'Verde'),
-        ('amarelo', 'Amarelo'),
+        ('vermelho', 'Vermelho'),
         ('laranja', 'Laranja'),
+        ('amarelo', 'Amarelo'),
+        ('verde', 'Verde'),
+        ('ciano', 'Ciano'),
+        ('azul', 'Azul'),
         ('roxo', 'Roxo'),
+        ('rosa', 'Rosa'),
+        ('branco', 'Branco'),
     ]
     MAX_TEXTO = 200
 
@@ -558,7 +562,7 @@ class AlertaQuadro(models.Model):
 
 class TracoQuadro(models.Model):
     """
-    Um traço feito à mão (mouse, caneta ou dedo) no quadro do NOC.
+    Um traço feito à mão (mouse, caneta ou dedo) ou uma forma no Quadro Rapidin.
 
     `pontos` é a lista [x0, y0, x1, y1, ...] em inteiros, medidos em décimos de
     milésimo da LARGURA do quadro (0 a 10000 na horizontal). Assim o desenho fica
@@ -567,8 +571,17 @@ class TracoQuadro(models.Model):
     """
 
     UNIDADES_POR_LARGURA = 10000
+    # "livre" é desenhado com curvas suaves; as formas, com segmentos retos entre os pontos
+    FORMAS = [
+        ('livre', 'Caneta'),
+        ('linha', 'Linha'),
+        ('seta', 'Seta'),
+        ('retangulo', 'Retângulo'),
+        ('elipse', 'Círculo'),
+    ]
 
     cor = models.CharField(max_length=10, choices=AnotacaoQuadro.CORES, default='rosa')
+    forma = models.CharField(max_length=10, choices=FORMAS, default='livre')
     pontos = models.JSONField()
     criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     apagado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')

@@ -478,7 +478,7 @@ class QuadroNocTests(TestCase):
         for user in (self.noc, self.sac_user, self.tec_user):
             self.client.force_login(user)
             resp = self.client.get(reverse('quadro'))
-            self.assertContains(resp, 'Quadro do NOC')
+            self.assertContains(resp, 'Quadro Rapidin')
         self.client.logout()
         self.assertEqual(self.client.get(reverse('quadro')).status_code, 302)
 
@@ -620,7 +620,7 @@ class QuadroNocTests(TestCase):
         self.assertTrue(d['tem_desenho'])
         self.client.force_login(self.sac_user)
         tracos = self.client.get(reverse('quadro_tracos'), {'ids': f'{traco_id},abc,999'}).json()['tracos']
-        self.assertEqual(tracos, [{'id': traco_id, 'cor': 'ciano', 'pontos': [100, 200, 300, 400, 500, 450]}])
+        self.assertEqual(tracos, [{'id': traco_id, 'cor': 'ciano', 'forma': 'livre', 'pontos': [100, 200, 300, 400, 500, 450]}])
 
         # A página já vem com os traços desenhados
         resp = self.client.get(reverse('quadro'))
@@ -669,7 +669,7 @@ class QuadroNocTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         d = self._novidades(self.sac_user, alerta=0)['alerta']
         self.assertEqual(d['linhas'], [])
-        self.assertEqual(d['tracos'], [{'cor': 'verde', 'pontos': [100, 200, 300, 400, 500, 450]}])
+        self.assertEqual(d['tracos'], [{'cor': 'verde', 'forma': 'livre', 'pontos': [100, 200, 300, 400, 500, 450]}])
         # A lista de últimos avisos só diz que tem desenho (não carrega o desenho)
         aviso = resp.json()['quadro']['avisos'][0]
         self.assertTrue(aviso['tem_desenho'])
@@ -681,6 +681,30 @@ class QuadroNocTests(TestCase):
         self._post('quadro_avisar', {'ids': [linha], 'desenho': False})
         d = self._novidades(self.sac_user, alerta=0)['alerta']
         self.assertEqual(([l['texto'] for l in d['linhas']], d['tracos']), (['A'], []))
+
+    def test_formas_e_cores_novas(self):
+        from .models import TracoQuadro
+        seta = [1000, 1000, 3000, 1000, 2800, 900, 3000, 1000, 2800, 1100]
+        resp = self._post('quadro_desenhar', {'cor': 'azul', 'forma': 'seta', 'pontos': seta})
+        self.assertEqual(resp.status_code, 200)
+        self._post('quadro_desenhar', {'cor': 'branco', 'forma': 'losango', 'pontos': [1, 2, 3, 4]})
+        self.assertEqual(
+            list(TracoQuadro.objects.values_list('cor', 'forma')),
+            [('azul', 'seta'), ('branco', 'livre')],  # forma desconhecida vira traço livre
+        )
+        self._post('quadro_escrever', {'texto': 'linha vermelha', 'cor': 'vermelho'})
+        resp = self._post('quadro_avisar')
+        d = self._novidades(self.sac_user, alerta=0)['alerta']
+        self.assertEqual(d['linhas'][0]['cor'], 'vermelho')
+        self.assertEqual(d['tracos'][0], {'cor': 'azul', 'forma': 'seta', 'pontos': seta})
+
+    def test_pagina_mostra_as_ferramentas_e_as_9_canetas(self):
+        self.client.force_login(self.sac_user)
+        resp = self.client.get(reverse('quadro'))
+        for ferramenta in ('texto', 'caneta', 'linha', 'seta', 'retangulo', 'elipse', 'apagador'):
+            self.assertContains(resp, f'data-ferramenta="{ferramenta}"')
+        self.assertContains(resp, 'name="cor"', count=9)
+        self.assertRegex(resp.content.decode(), r'name="cor" value="rosa"[^>]*checked')
 
     def test_aviso_sem_nada_marcado(self):
         self._post('quadro_escrever', {'texto': 'A'})

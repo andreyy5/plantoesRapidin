@@ -1,5 +1,5 @@
 """
-Quadro do NOC: um quadro "neon" compartilhado onde qualquer usuário escreve
+Quadro Rapidin (antes "Quadro do NOC"): um quadro "neon" compartilhado onde qualquer usuário escreve
 avisos (rompimentos de rota, SIUs fora...) e desenha com o mouse, e tudo
 aparece para todos.
 
@@ -42,7 +42,19 @@ INTERVALO_ENTRE_ALERTAS = timedelta(seconds=15)
 # Linhas e traços apagados ficam guardados por um tempo (para "Desfazer") e depois são removidos
 GUARDAR_APAGADOS = timedelta(days=30)
 
+# Barra de ferramentas da página: (valor, nome, dica, ícone)
+FERRAMENTAS = [
+    ('texto', 'Texto', 'Texto: digitar no quadro', 'type'),
+    ('caneta', 'Caneta', 'Caneta: escrever e desenhar à mão', 'pen'),
+    ('linha', 'Linha', 'Linha reta (segure Shift para ângulos de 45°)', 'linha'),
+    ('seta', 'Seta', 'Seta (segure Shift para ângulos de 45°)', 'seta'),
+    ('retangulo', 'Retângulo', 'Retângulo (segure Shift para um quadrado)', 'retangulo'),
+    ('elipse', 'Círculo', 'Círculo ou elipse (segure Shift para um círculo perfeito)', 'elipse'),
+    ('apagador', 'Apagador', 'Apagador: passe por cima de desenhos e formas', 'eraser'),
+]
+
 _CORES = {c for c, _ in AnotacaoQuadro.CORES}
+_FORMAS = {f for f, _ in TracoQuadro.FORMAS}
 
 
 # ---------- utilitários ----------
@@ -139,7 +151,7 @@ def _anotacao_json(a):
 
 
 def _traco_json(t):
-    return {'id': t.id, 'cor': t.cor, 'pontos': t.pontos}
+    return {'id': t.id, 'cor': t.cor, 'forma': t.forma, 'pontos': t.pontos}
 
 
 def _alerta_json(a, com_desenho=True):
@@ -212,6 +224,7 @@ def quadro(request):
             'dados_tracos': [_traco_json(t) for t in _tracos_ativos()],
         },
         'cores': AnotacaoQuadro.CORES,
+        'ferramentas': FERRAMENTAS,
         'max_texto': AnotacaoQuadro.MAX_TEXTO,
     })
 
@@ -314,7 +327,7 @@ def apagar(request, anotacao_id):
 @require_POST
 @_login_json
 def desenhar(request):
-    """Grava um traço feito à mão."""
+    """Grava um traço feito à mão ou uma forma (linha, seta, retângulo, círculo)."""
     dados = _dados(request)
     pontos = _pontos_validos(dados.get('pontos'))
     if pontos is None:
@@ -322,7 +335,8 @@ def desenhar(request):
     if _tracos_ativos().count() >= MAX_TRACOS:
         return _erro('O quadro está cheio de desenhos. Use o apagador ou limpe o quadro.')
     cor = dados.get('cor') if dados.get('cor') in _CORES else 'rosa'
-    traco = TracoQuadro.objects.create(cor=cor, pontos=pontos, criado_por=request.user)
+    forma = dados.get('forma') if dados.get('forma') in _FORMAS else 'livre'
+    traco = TracoQuadro.objects.create(cor=cor, forma=forma, pontos=pontos, criado_por=request.user)
     return _resposta_com_estado(request, id=traco.id)
 
 
@@ -393,7 +407,7 @@ def avisar(request):
     linhas = [{'texto': a.texto, 'cor': a.cor} for a in anotacoes]
     desenho = []
     if dados.get('desenho', True):
-        desenho = [{'cor': t.cor, 'pontos': t.pontos} for t in _tracos_ativos()]
+        desenho = [{'cor': t.cor, 'forma': t.forma, 'pontos': t.pontos} for t in _tracos_ativos()]
     if not linhas and not desenho:
         return _erro('Não há nada no quadro para avisar.')
     alerta = AlertaQuadro.objects.create(linhas=linhas, tracos=desenho, criado_por=request.user)

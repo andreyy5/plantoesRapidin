@@ -7,7 +7,7 @@ urlpatterns = [
     # Dashboard
     path('', views.dashboard, name='dashboard'),
     
-    # Quadro do NOC
+    # Quadro Rapidin
     path('quadro/', quadro.quadro, name='quadro'),
     path('quadro/novidades/', quadro.novidades, name='quadro_novidades'),
     path('quadro/escrever/', quadro.escrever, name='quadro_escrever'),
