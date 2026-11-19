@@ -5,7 +5,7 @@
   {% include 'partials/icon.html' with nome=icone classe='w-4 h-4 shrink-0' %}
   <span class="flex-1 truncate">{{ label }}</span>
   {% if contador %}
-  <span data-contador="{{ contador }}" class="hidden min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold items-center justify-center {% if chave == nav_ativo %}bg-white/25 text-white{% else %}bg-fuchsia-500/15 text-fuchsia-300 ring-1 ring-fuchsia-400/40{% endif %}"></span>
+  <span data-contador="{{ contador }}" class="hidden min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold items-center justify-center {% if chave == nav_ativo %}bg-white/25 text-white{% else %}bg-orange-500/15 text-orange-300 ring-1 ring-orange-400/40{% endif %}"></span>
   {% endif %}
   {% if badge %}
   <span class="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center" aria-label="{{ badge }} não lidas">{{ badge }}</span>

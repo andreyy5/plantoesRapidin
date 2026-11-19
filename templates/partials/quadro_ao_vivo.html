@@ -1,65 +1,126 @@
 {% load static %}{# Quadro do NOC: consulta periódica, contador no menu e aviso em tela + voz. Incluído no base.html para usuários logados. #}
 <style>
   .font-quadro { font-family: 'Caveat', 'Segoe Print', 'Comic Sans MS', cursive; font-weight: 700; }
+  /* Texto neon: o brilho é proporcional ao tamanho da letra (em) */
   .neon {
     --neon: #ff4fd8;
     color: var(--neon);
     color: color-mix(in oklab, var(--neon) 70%, white);
-    text-shadow: 0 0 6px var(--neon), 0 0 16px var(--neon);
-    text-shadow: 0 0 2px color-mix(in oklab, var(--neon) 60%, white), 0 0 8px var(--neon), 0 0 20px var(--neon),
-                 0 0 34px color-mix(in oklab, var(--neon) 55%, transparent);
+    text-shadow: 0 0 .15em var(--neon), 0 0 .45em var(--neon);
+    text-shadow: 0 0 .06em color-mix(in oklab, var(--neon) 60%, white), 0 0 .22em var(--neon), 0 0 .55em var(--neon),
+                 0 0 .95em color-mix(in oklab, var(--neon) 55%, transparent);
   }
-  .neon.neon-fraco { text-shadow: 0 0 1px var(--neon), 0 0 6px var(--neon), 0 0 12px color-mix(in oklab, var(--neon) 60%, transparent); }
+  .neon.neon-fraco { text-shadow: 0 0 .05em var(--neon), 0 0 .3em var(--neon), 0 0 .6em color-mix(in oklab, var(--neon) 60%, transparent); }
   .neon::placeholder { color: rgba(255,255,255,.28); text-shadow: none; }
   .neon-rosa { --neon: #ff4fd8; } .neon-ciano { --neon: #2ee6ff; } .neon-verde { --neon: #4dff8f; }
   .neon-amarelo { --neon: #fff35c; } .neon-laranja { --neon: #ff8a4c; } .neon-roxo { --neon: #bd8cff; }
 
-  @property --giro { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-  @keyframes giro-neon { to { --giro: 360deg; } }
-  .moldura-neon {
-    position: relative; isolation: isolate;
-    background: conic-gradient(from var(--giro), #ff4fd8, #2ee6ff, #4dff8f, #fff35c, #ff8a4c, #bd8cff, #ff4fd8);
-    animation: giro-neon 10s linear infinite;
+  /* Traços desenhados à mão (SVG; 1 unidade = 1/10000 da largura do quadro) */
+  .traco { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .traco-brilho { stroke: var(--neon); stroke-width: 95px; opacity: .6; }
+  .traco-nucleo { stroke: var(--neon); stroke: color-mix(in oklab, var(--neon) 62%, white); stroke-width: 30px; }
+  .traco-vivo-brilho { stroke: var(--neon); stroke-width: 90px; opacity: .22; }
+
+  /* Moldura neon laranja: borda acesa, dois cometas de luz girando, brilho que "respira" e cantos de mira.
+     Só anima transform e opacity, para poder ficar aberta o dia inteiro sem pesar no computador. */
+  .neon-moldura { --raio: 30px; position: relative; isolation: isolate; border-radius: var(--raio); }
+  .neon-moldura__aura {
+    position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 12px 1px rgba(255,110,30,.8), 0 0 42px 6px rgba(255,90,10,.38), 0 0 110px 12px rgba(255,80,0,.16);
+    animation: neon-ligar 1.6s linear both, neon-respirar 3.4s ease-in-out 1.6s infinite;
   }
-  .moldura-neon::before {
-    content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: -1;
-    background: inherit; animation: inherit; filter: blur(18px); opacity: .5;
+  .neon-moldura--compacta .neon-moldura__aura {
+    box-shadow: 0 0 10px 1px rgba(255,110,30,.8), 0 0 22px 2px rgba(255,90,10,.35);
   }
+  /* O rastro desfocado dos cometas some aos poucos para fora da moldura (sem borda dura) */
+  .neon-moldura__cometas {
+    position: absolute; inset: -16px; z-index: 0; border-radius: calc(var(--raio) + 16px);
+    overflow: hidden; pointer-events: none; opacity: .85; animation: neon-ligar 1.6s linear both;
+    -webkit-mask: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent),
+                  linear-gradient(180deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+    -webkit-mask-composite: source-in;
+    mask: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent),
+          linear-gradient(180deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+    mask-composite: intersect;
+  }
+  .neon-moldura__borda {
+    position: relative; z-index: 1; border-radius: inherit; padding: 3px; overflow: hidden;
+    background: linear-gradient(135deg, #ff4800, #ff8c3a 28%, #ff5a10 52%, #ffa35c 78%, #ff4800);
+  }
+  .neon-moldura__borda > * { position: relative; z-index: 1; }
+  .neon-moldura__cometas::before, .neon-moldura__borda::before {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 170%; aspect-ratio: 1; translate: -50% -50%;
+    background: conic-gradient(transparent 0 22%, #ff6a0d 43%, #fff3e3 49.4%, transparent 50%,
+                               transparent 72%, #ff6a0d 93%, #fff3e3 99.4%, transparent 100%);
+    animation: neon-girar 5s linear infinite;
+  }
+  .neon-moldura__cometas::before { filter: blur(9px); }
+  .neon-moldura::after {
+    content: ''; position: absolute; inset: -11px; z-index: 2; pointer-events: none;
+    --c: #ffb47c; --l: 26px; --e: 2px;
+    background:
+      linear-gradient(var(--c) 0 0) 0 0 / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) 0 0 / var(--e) var(--l) no-repeat,
+      linear-gradient(var(--c) 0 0) 100% 0 / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) 100% 0 / var(--e) var(--l) no-repeat,
+      linear-gradient(var(--c) 0 0) 0 100% / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) 0 100% / var(--e) var(--l) no-repeat,
+      linear-gradient(var(--c) 0 0) 100% 100% / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) 100% 100% / var(--e) var(--l) no-repeat;
+    filter: drop-shadow(0 0 3px #ff6a1a) drop-shadow(0 0 8px rgba(255,106,26,.6));
+    animation: neon-mira 2.8s ease-in-out infinite;
+  }
+  @keyframes neon-girar { to { rotate: 1turn; } }
+  @keyframes neon-respirar { 50% { opacity: .5; } }
+  @keyframes neon-mira { 0%, 100% { opacity: .95; } 50% { opacity: .3; } }
+  @keyframes neon-ligar { 0% { opacity: 0; } 8% { opacity: .9; } 11% { opacity: .1; } 19% { opacity: 1; } 22% { opacity: .3; } 30%, 100% { opacity: 1; } }
+
   @keyframes pulso-aviso { 0% { box-shadow: 0 0 0 0 rgba(233,73,32,.65); } 100% { box-shadow: 0 0 0 14px rgba(233,73,32,0); } }
   .pulso-aviso { animation: pulso-aviso 1.2s ease-out infinite; }
-  @media (prefers-reduced-motion: reduce) { .moldura-neon, .moldura-neon::before, .pulso-aviso { animation: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .neon-moldura__aura, .neon-moldura__cometas, .neon-moldura__cometas::before, .neon-moldura__borda::before,
+    .neon-moldura::after, .pulso-aviso { animation: none; }
+  }
 </style>
 
+{# Filtro de brilho dos desenhos, usado pelo quadro e pelas prévias #}
+<svg width="0" height="0" class="absolute" aria-hidden="true" focusable="false">
+  <filter id="quadro-brilho" filterUnits="userSpaceOnUse" x="-3000" y="-3000" width="16000" height="50000">
+    <feGaussianBlur stdDeviation="42"/>
+  </filter>
+</svg>
+
 <dialog id="alerta-quadro" aria-labelledby="alerta-quadro-titulo" aria-describedby="alerta-quadro-linhas"
-        class="p-4 sm:p-6 bg-transparent w-full max-w-[39rem] backdrop:bg-black/75 backdrop:backdrop-blur-sm">
-  <div class="moldura-neon rounded-[28px] p-[3px]">
-    <div class="rounded-[25px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
-      <div class="flex items-start gap-3">
-        <span class="pulso-aviso w-11 h-11 rounded-2xl bg-[#E94920] text-white flex items-center justify-center shrink-0">
-          {% include 'partials/icon.html' with nome='megaphone' classe='w-6 h-6' %}
-        </span>
-        <div class="min-w-0">
-          <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-fuchsia-300/80">Aviso do NOC</p>
-          <h2 id="alerta-quadro-titulo" class="text-lg font-bold text-white leading-tight">Atenção ao quadro</h2>
-          <p class="text-xs text-gray-400 mt-0.5" data-alerta-meta></p>
+        class="p-6 bg-transparent w-full max-w-[40rem] backdrop:bg-black/75 backdrop:backdrop-blur-sm">
+  <div class="neon-moldura neon-moldura--compacta" style="--raio: 28px">
+    <span class="neon-moldura__aura" aria-hidden="true"></span>
+    <span class="neon-moldura__cometas" aria-hidden="true"></span>
+    <div class="neon-moldura__borda">
+      <div class="rounded-[25px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
+        <div class="flex items-start gap-3">
+          <span class="pulso-aviso w-11 h-11 rounded-2xl bg-[#E94920] text-white flex items-center justify-center shrink-0">
+            {% include 'partials/icon.html' with nome='megaphone' classe='w-6 h-6' %}
+          </span>
+          <div class="min-w-0">
+            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300/90">Aviso do NOC</p>
+            <h2 id="alerta-quadro-titulo" class="text-lg font-bold text-white leading-tight">Atenção ao quadro</h2>
+            <p class="text-xs text-gray-400 mt-0.5" data-alerta-meta></p>
+          </div>
         </div>
-      </div>
-      <ul id="alerta-quadro-linhas" class="mt-5 flex flex-col gap-1"></ul>
-      <p data-alerta-dica-voz class="hidden mt-4 px-3 py-2 rounded-xl bg-amber-400/10 text-amber-200 text-xs font-medium">
-        O navegador bloqueou a leitura automática. Clique em <strong>Ouvir aviso</strong> para escutar.
-      </p>
-      <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
-        <button type="button" data-alerta-ouvir class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
-          {% include 'partials/icon.html' with nome='volume' classe='w-4 h-4' %}
-          <span data-alerta-ouvir-texto>Ouvir de novo</span>
-        </button>
-        <a href="{% url 'quadro' %}" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
-          {% include 'partials/icon.html' with nome='board' classe='w-4 h-4' %}
-          Abrir quadro
-        </a>
-        <button type="button" data-alerta-ciente class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-lg shadow-[#E94920]/30">
-          Ciente
-        </button>
+        <ul id="alerta-quadro-linhas" class="mt-5 flex flex-col gap-1"></ul>
+        <div data-alerta-desenho class="hidden mt-4 rounded-2xl bg-black/40 ring-1 ring-white/10 p-2"></div>
+        <p data-alerta-dica-voz class="hidden mt-4 px-3 py-2 rounded-xl bg-amber-400/10 text-amber-200 text-xs font-medium">
+          O navegador bloqueou a leitura automática. Clique em <strong>Ouvir aviso</strong> para escutar.
+        </p>
+        <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
+          <button type="button" data-alerta-ouvir class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+            {% include 'partials/icon.html' with nome='volume' classe='w-4 h-4' %}
+            <span data-alerta-ouvir-texto>Ouvir de novo</span>
+          </button>
+          <a href="{% url 'quadro' %}" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+            {% include 'partials/icon.html' with nome='board' classe='w-4 h-4' %}
+            Abrir quadro
+          </a>
+          <button type="button" data-alerta-ciente class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-lg shadow-[#E94920]/30">
+            Ciente
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -69,6 +130,8 @@
 (function () {
   var URL_NOVIDADES = '{% url "quadro_novidades" %}';
   var ICONE = '{% static "assets/favicon.png" %}';
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var LARGURA = 10000;  // unidades do desenho por largura do quadro
   // Por aba (sobrevive à troca de página): último aviso que esta aba já viu
   var CHAVE_VISTO = 'quadro.alertaVisto';
   // Compartilhadas entre abas: evita ler o mesmo aviso duas vezes e fecha o aviso em todas ao clicar em "Ciente"
@@ -82,6 +145,7 @@
   visto = visto === null ? null : numero(visto);
 
   var api = window.QuadroAoVivo = {
+    LARGURA: LARGURA,
     versao: null,      // definido pela página do quadro
     ouvinte: null,     // function (resposta, inicioDaConsulta)
     aoMudarStatus: null,
@@ -94,7 +158,57 @@
       setTimeout(function () { falar(['Teste do quadro do NOC.', 'Vila Militar 1/1/1 fora.']); }, 700);
     },
     formatarHora: formatarHora,
+    caminho: caminho,
+    criarTraco: criarTraco,
+    previa: previa,
   };
+
+  // ---------- desenho ----------
+  // Curva suave passando pelos pontos médios: [x0, y0, x1, y1, ...] -> atributo "d" do SVG
+  function caminho(p) {
+    var n = p.length / 2;
+    var d = 'M' + p[0] + ' ' + p[1];
+    if (n < 3) return d + 'L' + p[n * 2 - 2] + ' ' + p[n * 2 - 1];
+    for (var i = 1; i < n - 1; i++) {
+      d += 'Q' + p[2 * i] + ' ' + p[2 * i + 1] + ' ' + (p[2 * i] + p[2 * i + 2]) / 2 + ' ' + (p[2 * i + 1] + p[2 * i + 3]) / 2;
+    }
+    return d + 'L' + p[2 * n - 2] + ' ' + p[2 * n - 1];
+  }
+
+  function criarTraco(cor, pontos, classe) {
+    var el = document.createElementNS(SVG_NS, 'path');
+    el.setAttribute('class', 'traco ' + classe + ' neon-' + cor);
+    el.setAttribute('d', caminho(pontos));
+    return el;
+  }
+
+  // SVG só com o desenho, recortado em volta dos traços (para o aviso e as listas)
+  function previa(tracos) {
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    tracos.forEach(function (t) {
+      for (var i = 0; i < t.pontos.length; i += 2) {
+        minX = Math.min(minX, t.pontos[i]); maxX = Math.max(maxX, t.pontos[i]);
+        minY = Math.min(minY, t.pontos[i + 1]); maxY = Math.max(maxY, t.pontos[i + 1]);
+      }
+    });
+    var folga = 260;
+    var w = Math.max(maxX - minX + folga * 2, LARGURA * 0.45), h = Math.max(maxY - minY + folga * 2, 700);
+    var x = (minX + maxX) / 2 - w / 2, y = (minY + maxY) / 2 - h / 2;
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', [x, y, w, h].map(Math.round).join(' '));
+    svg.setAttribute('class', 'block w-full max-h-[38vh]');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Desenho feito no quadro');
+    svg.style.aspectRatio = w + ' / ' + h;
+    var brilho = document.createElementNS(SVG_NS, 'g'), nucleo = document.createElementNS(SVG_NS, 'g');
+    brilho.setAttribute('filter', 'url(#quadro-brilho)');
+    tracos.forEach(function (t) {
+      brilho.appendChild(criarTraco(t.cor, t.pontos, 'traco-brilho'));
+      nucleo.appendChild(criarTraco(t.cor, t.pontos, 'traco-nucleo'));
+    });
+    svg.appendChild(brilho); svg.appendChild(nucleo);
+    return svg;
+  }
 
   // ---------- consulta periódica ----------
   var emAndamento = false, ultimaConsulta = 0, falhas = 0, parado = false, status = null;
@@ -138,10 +252,11 @@
   function tratar(d, inicio) {
     var n = d.linhas_no_quadro || 0;
     document.querySelectorAll('[data-contador="quadro"]').forEach(function (el) {
-      el.textContent = n;
-      el.classList.toggle('hidden', !n);
-      el.classList.toggle('flex', !!n);
-      el.setAttribute('aria-label', n + (n === 1 ? ' linha' : ' linhas') + ' no quadro');
+      var mostrar = n > 0 || d.tem_desenho;
+      el.textContent = n || '•';
+      el.classList.toggle('hidden', !mostrar);
+      el.classList.toggle('flex', !!mostrar);
+      el.setAttribute('aria-label', n ? n + (n === 1 ? ' linha' : ' linhas') + ' no quadro' : 'Há um desenho no quadro');
     });
 
     if (d.alerta && visto !== null) mostrarAlerta(d.alerta);
@@ -170,6 +285,7 @@
   // ---------- aviso ----------
   var dialogo = document.getElementById('alerta-quadro');
   var listaAlerta = document.getElementById('alerta-quadro-linhas');
+  var caixaDesenho = dialogo.querySelector('[data-alerta-desenho]');
   var meta = dialogo.querySelector('[data-alerta-meta]');
   var dicaVoz = dialogo.querySelector('[data-alerta-dica-voz]');
   var botaoOuvir = dialogo.querySelector('[data-alerta-ouvir]');
@@ -197,6 +313,10 @@
       li.textContent = l.texto;
       listaAlerta.appendChild(li);
     });
+    var tracos = a.tracos || [];
+    caixaDesenho.replaceChildren();
+    caixaDesenho.classList.toggle('hidden', !tracos.length);
+    if (tracos.length) caixaDesenho.appendChild(previa(tracos));
     dicaVoz.classList.add('hidden');
     textoOuvir.textContent = 'Ouvir de novo';
     if (!dialogo.open) {
@@ -254,9 +374,10 @@
   function notificarSistema(a) {
     if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
     try {
+      var texto = a.linhas.map(function (l) { return l.texto; }).join('\n');
+      if (a.tracos && a.tracos.length) texto = texto ? texto + '\n(+ desenho no quadro)' : 'Desenho no quadro';
       var n = new Notification('Aviso do NOC', {
-        body: a.linhas.map(function (l) { return l.texto; }).join('\n'),
-        tag: 'quadro-noc-' + a.id, icon: ICONE, requireInteraction: true,
+        body: texto, tag: 'quadro-noc-' + a.id, icon: ICONE, requireInteraction: true,
       });
       n.onclick = function () { window.focus(); n.close(); };
     } catch (e) {}
@@ -282,8 +403,13 @@
     } catch (e) {}
   }
 
+  // O texto digitado é lido; o desenho à mão não dá para ler, então só avisa que existe
   function frasesDoAlerta(a) {
-    return ['Atenção, aviso no quadro do NOC.'].concat(a.linhas.map(function (l) { return l.texto; }));
+    var frases = ['Atenção, aviso no quadro do NOC.'].concat(a.linhas.map(function (l) { return l.texto; }));
+    if (a.tracos && a.tracos.length) {
+      frases.push(a.linhas.length ? 'Há também um desenho no quadro.' : 'Há um desenho no quadro. Confira na tela.');
+    }
+    return frases;
   }
 
   // "1/1/1" seria lido como data ("1 de janeiro..."); no NOC é slot/porta, lido como "1 barra 1 barra 1"

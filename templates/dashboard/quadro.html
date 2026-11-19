@@ -3,14 +3,54 @@
 
 {% block extra_css %}
 <style>
+  /* ---------- superfície ---------- */
   .quadro-superficie {
     background:
-      radial-gradient(120% 70% at 8% 0%, rgba(255,255,255,.075), transparent 55%),
-      radial-gradient(70% 60% at 100% 100%, rgba(46,230,255,.05), transparent 60%),
+      radial-gradient(120% 70% at 8% 0%, rgba(255,255,255,.07), transparent 55%),
+      radial-gradient(70% 60% at 100% 100%, rgba(255,106,26,.07), transparent 60%),
       repeating-linear-gradient(115deg, rgba(255,255,255,.012) 0 2px, transparent 2px 7px),
       #07070c;
   }
-  /* Bandeja de canetas */
+  /* Faixa de luz que varre o quadro de tempos em tempos */
+  .quadro-superficie::after {
+    content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    background: linear-gradient(180deg, transparent 0 46%, rgba(255,122,40,.08) 50%, transparent 54% 100%);
+    translate: 0 -60%; animation: quadro-varrer 9s linear infinite;
+  }
+  @keyframes quadro-varrer { 0% { translate: 0 -60%; } 40%, 100% { translate: 0 60%; } }
+
+  /* ---------- área proporcional ----------
+     Tudo dentro dela é medido em cqw (% da largura do quadro), então texto e desenho
+     ficam no mesmo lugar em qualquer tamanho de tela, inclusive no modo expandido. */
+  .quadro-container { container-type: inline-size; min-width: 560px; }
+  .quadro-area { position: relative; min-height: 56.25cqw; }
+  .modo-caneta .quadro-area, .modo-apagador .quadro-area { -webkit-user-select: none; user-select: none; }
+  .quadro-linhas { position: relative; display: flex; flex-direction: column; gap: .35cqw; padding: 2.4cqw 3cqw 2cqw; }
+  .linha { position: relative; border-radius: 1.2cqw; padding: .15cqw 1cqw; transition: background-color .15s; }
+  .linha:hover { background: rgba(255,255,255,.035); }
+  .linha-texto { font-size: 3.8cqw; line-height: 1.2; padding-right: 10cqw; overflow-wrap: anywhere; }
+  .linha-edicao { font-size: 3.8cqw; line-height: 1.2; }
+  .linha-acoes { position: absolute; top: .45cqw; right: .6cqw; display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity .15s; }
+  .linha:hover .linha-acoes, .linha:focus-within .linha-acoes { opacity: 1; }
+  @media (hover: none) { .linha-acoes { opacity: 1; } .linha-meta { display: none; } }
+  .modo-caneta .linha-acoes, .modo-apagador .linha-acoes { visibility: hidden; }
+  .quadro-vazio { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 8cqw; pointer-events: none; }
+  .quadro-vazio[hidden] { display: none; }
+  .quadro-vazio-titulo { font-size: 5cqw; }
+  .quadro-vazio-texto { font-size: max(13px, 1.5cqw); }
+
+  /* ---------- desenho ---------- */
+  .quadro-desenho { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .modo-caneta .quadro-desenho, .modo-apagador .quadro-desenho { pointer-events: auto; touch-action: none; }
+  .modo-caneta .quadro-desenho { cursor: crosshair; }
+  .modo-apagador .quadro-desenho {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='14' r='11' fill='rgba(255,255,255,.15)' stroke='white' stroke-width='2'/%3E%3C/svg%3E") 14 14, cell;
+  }
+  .traco-alvo { stroke: transparent; stroke-width: 220px; pointer-events: none; }
+  .modo-apagador .traco-alvo { pointer-events: stroke; }
+  .traco.apagando { opacity: .12; }
+
+  /* ---------- bandeja de canetas ---------- */
   .caneta-corpo {
     --neon: #ff4fd8;
     position: relative; display: block; width: 58px; height: 16px; border-radius: 3px 8px 8px 3px;
@@ -24,14 +64,38 @@
   }
   input:checked + .caneta-corpo { transform: translateY(-5px); box-shadow: 0 0 14px var(--neon), 0 0 3px var(--neon), inset 0 1px 0 rgba(255,255,255,.25); }
   input:focus-visible + .caneta-corpo { outline: 2px solid #fff; outline-offset: 4px; }
-  /* Linha nova: aparece como se estivesse sendo escrita (margens negativas para não cortar o brilho) */
+  .caneta-corpo { width: 48px; }
+  .quadro-expandido .caneta-corpo { width: 58px; }
+  @media (max-width: 639px) { .caneta-corpo { width: 44px; } }
+
+  /* ---------- linha nova: aparece como se estivesse sendo escrita ---------- */
   @keyframes escrevendo { from { clip-path: inset(-1em 100% -1em -1em); } to { clip-path: inset(-1em -1em -1em -1em); } }
   @keyframes acendendo { 0%, 100% { filter: none; } 30% { filter: brightness(1.8); } }
   .linha-nova .neon { animation: escrevendo .7s cubic-bezier(.3,.7,.4,1) backwards, acendendo 1.2s ease-out .5s; }
-  @media (max-width: 639px) { .caneta-corpo { width: 44px; } }
   @keyframes tremer { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
   .tremer { animation: tremer .25s ease 2; }
-  @media (prefers-reduced-motion: reduce) { .linha-nova .neon, .tremer { animation: none; } }
+
+  /* ---------- modo expandido (tela cheia) ---------- */
+  .quadro-expandido {
+    position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; gap: 16px;
+    padding: 14px 22px 16px; overflow: hidden;
+    background: radial-gradient(90% 60% at 50% 0%, #2a1206, #050507 70%);
+  }
+  .quadro-expandido .quadro-palco {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; margin-inline: auto;
+    width: min(100%, calc((100vh - 250px) * 16 / 9));
+  }
+  .quadro-expandido .neon-moldura,
+  .quadro-expandido .neon-moldura__borda,
+  .quadro-expandido .quadro-rolagem,
+  .quadro-expandido .quadro-container { display: flex; flex-direction: column; }
+  .quadro-expandido .neon-moldura, .quadro-expandido .neon-moldura__borda,
+  .quadro-expandido .quadro-superficie, .quadro-expandido .quadro-rolagem { flex: 1; min-height: 0; }
+  .quadro-expandido .quadro-container, .quadro-expandido .quadro-area { flex: 1 0 auto; }
+  .so-expandido { display: none; }
+  .quadro-expandido .so-expandido { display: inline-flex; }
+
+  @media (prefers-reduced-motion: reduce) { .linha-nova .neon, .tremer, .quadro-superficie::after { animation: none; } }
 </style>
 {% endblock %}
 
@@ -39,71 +103,119 @@
 {% csrf_token %}
 
 <!-- Cabeçalho -->
-<div class="flex items-start justify-between flex-wrap gap-3">
-  <div>
-    <h1 class="text-xl font-bold text-[#50443C]">Quadro do NOC</h1>
-    <p class="text-xs text-gray-400 font-medium mt-1">O que for escrito aqui aparece na hora para todos. Use <strong class="text-gray-500">Avisar</strong> para chamar quem está conectado.</p>
-  </div>
-  <div class="flex items-center gap-2 flex-wrap">
-    <span id="status" class="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-gray-200/80 text-xs font-bold text-emerald-700" role="status">
-      <span class="relative flex w-2.5 h-2.5" aria-hidden="true">
-        <span data-status-ping class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-        <span data-status-ponto class="relative inline-flex rounded-full w-2.5 h-2.5 bg-emerald-500"></span>
-      </span>
-      <span data-status-texto>Ao vivo</span>
-    </span>
-    <button type="button" id="botao-avisar"
-            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-[#E94920]">
-      {% include 'partials/icon.html' with nome='megaphone' classe='w-4 h-4' %}
-      Avisar
-    </button>
-  </div>
+<div>
+  <h1 class="text-xl font-bold text-[#50443C]">Quadro do NOC</h1>
+  <p class="text-xs text-gray-400 font-medium mt-1">Escreva ou desenhe: tudo aparece na hora para todos. Use <strong class="text-gray-500">Avisar</strong> para chamar quem está conectado.</p>
 </div>
 
 <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
 
   <!-- Quadro -->
-  <section aria-labelledby="titulo-quadro" class="min-w-0">
+  <section id="secao-quadro" class="quadro-secao modo-texto min-w-0 flex flex-col gap-4" aria-labelledby="titulo-quadro">
     <h2 id="titulo-quadro" class="sr-only">Quadro</h2>
-    <div class="moldura-neon rounded-[30px] p-[3px] shadow-xl shadow-black/20">
-      <div class="quadro-superficie rounded-[27px] min-h-[440px] sm:min-h-[520px] flex flex-col px-3 sm:px-6 pt-5 sm:pt-6 pb-4">
 
-        <ul id="linhas" class="flex flex-col gap-0.5 sm:gap-1" aria-label="Linhas do quadro"></ul>
-
-        <div id="vazio" class="hidden flex-1 flex flex-col items-center justify-center text-center px-4 py-10">
-          <p class="neon neon-ciano font-quadro text-4xl sm:text-5xl opacity-60">Quadro limpo</p>
-          <p class="mt-3 text-sm text-white/40">Nada fora do normal por enquanto. Escreva abaixo quando algo cair,<br class="hidden sm:inline"> por exemplo <span class="text-white/60">Vila Militar 1/1/1 fora</span>.</p>
-        </div>
-
-        <form id="form-escrever" class="mt-auto pt-4 border-t border-white/10 flex items-center gap-2 sm:gap-3" autocomplete="off" novalidate>
-          <label for="nova-linha" class="sr-only">Escrever no quadro</label>
-          <input id="nova-linha" type="text" maxlength="{{ max_texto }}" enterkeyhint="send"
-                 placeholder="Escreva aqui... ex.: Centro 1/12 fora parcialmente"
-                 class="neon neon-rosa font-quadro flex-1 min-w-0 bg-transparent text-[24px] sm:text-[30px] leading-tight py-1 outline-none focus:outline-none focus-visible:outline-none">
-          <button type="submit" class="shrink-0 inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl text-sm font-bold bg-white/10 text-white hover:bg-white/20 transition-colors">
-            {% include 'partials/icon.html' with nome='edit' classe='w-4 h-4' %}
-            <span class="hidden sm:inline">Escrever</span><span class="sr-only sm:hidden">Escrever</span>
-          </button>
-        </form>
+    <!-- Ferramentas -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="so-expandido items-center gap-2 mr-2 text-white font-bold">
+        {% include 'partials/icon.html' with nome='board' classe='w-5 h-5 text-orange-400' %}
+        Quadro do NOC
+      </span>
+      <div role="group" aria-label="Ferramenta" class="inline-flex p-1 rounded-xl bg-white border border-gray-200/80 shadow-sm">
+        <button type="button" data-ferramenta="texto" aria-pressed="true" title="Digitar no quadro"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 hover:text-[#50443C] transition-colors aria-pressed:bg-[#E94920] aria-pressed:text-white aria-pressed:shadow-sm">
+          {% include 'partials/icon.html' with nome='type' classe='w-4 h-4' %}<span class="hidden sm:inline">Texto</span><span class="sr-only sm:hidden">Texto</span>
+        </button>
+        <button type="button" data-ferramenta="caneta" aria-pressed="false" title="Escrever e desenhar com o mouse"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 hover:text-[#50443C] transition-colors aria-pressed:bg-[#E94920] aria-pressed:text-white aria-pressed:shadow-sm">
+          {% include 'partials/icon.html' with nome='pen' classe='w-4 h-4' %}<span class="hidden sm:inline">Caneta</span><span class="sr-only sm:hidden">Caneta</span>
+        </button>
+        <button type="button" data-ferramenta="apagador" aria-pressed="false" title="Apagar traços do desenho"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 hover:text-[#50443C] transition-colors aria-pressed:bg-[#E94920] aria-pressed:text-white aria-pressed:shadow-sm">
+          {% include 'partials/icon.html' with nome='eraser' classe='w-4 h-4' %}<span class="hidden sm:inline">Apagador</span><span class="sr-only sm:hidden">Apagador</span>
+        </button>
       </div>
+      <span class="flex-1"></span>
+      <span id="status" class="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-gray-200/80 text-xs font-bold text-emerald-700" role="status">
+        <span class="relative flex w-2.5 h-2.5" aria-hidden="true">
+          <span data-status-ping class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span data-status-ponto class="relative inline-flex rounded-full w-2.5 h-2.5 bg-emerald-500"></span>
+        </span>
+        <span data-status-texto>Ao vivo</span>
+      </span>
+      <button type="button" id="botao-expandir" aria-pressed="false"
+              class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-200/80 text-[#50443C] hover:bg-gray-50 transition-colors">
+        <span data-icone-expandir>{% include 'partials/icon.html' with nome='expand' classe='w-4 h-4' %}</span>
+        <span data-icone-recolher class="hidden">{% include 'partials/icon.html' with nome='collapse' classe='w-4 h-4' %}</span>
+        <span data-expandir-texto class="hidden sm:inline">Expandir</span>
+      </button>
+      <button type="button" id="botao-avisar"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-[#E94920]">
+        {% include 'partials/icon.html' with nome='megaphone' classe='w-4 h-4' %}
+        Avisar
+      </button>
     </div>
 
-    <!-- Bandeja: cor da caneta e apagador -->
-    <div class="mx-4 sm:mx-8 -mt-px flex items-center gap-3 sm:gap-5 px-4 sm:px-5 pt-4 pb-3 rounded-b-2xl bg-gradient-to-b from-[#3a3a44] to-[#25252d] shadow-md">
-      <fieldset class="flex items-center gap-x-3 gap-y-2 sm:gap-6 flex-wrap min-w-0">
-        <legend class="sr-only">Cor da caneta</legend>
-        {% for valor, rotulo in cores %}
-        <label class="cursor-pointer py-1 pl-2" title="Caneta {{ rotulo|lower }}">
-          <input type="radio" name="cor" value="{{ valor }}" class="sr-only" {% if forloop.first %}checked{% endif %}>
-          <span class="caneta-corpo neon-{{ valor }}" aria-hidden="true"></span>
-          <span class="sr-only">{{ rotulo }}</span>
-        </label>
-        {% endfor %}
-      </fieldset>
-      <button type="button" id="botao-limpar" class="ml-auto shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
-        {% include 'partials/icon.html' with nome='trash' classe='w-4 h-4' %}
-        <span class="hidden sm:inline">Limpar quadro</span><span class="sr-only sm:hidden">Limpar quadro</span>
-      </button>
+    <div class="quadro-palco">
+      <div class="neon-moldura">
+        <span class="neon-moldura__aura" aria-hidden="true"></span>
+        <span class="neon-moldura__cometas" aria-hidden="true"></span>
+        <div class="neon-moldura__borda">
+          <div class="quadro-superficie rounded-[27px] overflow-hidden flex flex-col">
+            <div class="quadro-rolagem overflow-x-auto">
+              <div class="quadro-container">
+                <div id="area" class="quadro-area">
+                  <ul id="linhas" class="quadro-linhas" aria-label="Linhas do quadro"></ul>
+                  <div id="vazio" class="quadro-vazio" hidden>
+                    <p class="neon neon-laranja font-quadro quadro-vazio-titulo opacity-75">Quadro limpo</p>
+                    <p class="quadro-vazio-texto mt-2 text-white/45">Digite abaixo ou pegue a <span class="text-white/75">Caneta</span> para escrever com o mouse.</p>
+                  </div>
+                  <svg id="desenho" class="quadro-desenho" role="img" aria-label="Desenhos do quadro">
+                    <g id="g-brilho" filter="url(#quadro-brilho)"></g>
+                    <g id="g-nucleo"></g>
+                    <g id="g-alvo"></g>
+                    <g id="g-vivo"></g>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <form id="form-escrever" class="px-3 sm:px-6 py-3 border-t border-white/10 flex items-center gap-2 sm:gap-3" autocomplete="off" novalidate>
+              <label for="nova-linha" class="sr-only">Escrever no quadro</label>
+              <input id="nova-linha" type="text" maxlength="{{ max_texto }}" enterkeyhint="send"
+                     placeholder="Digite aqui... ex.: Centro 1/12 fora parcialmente"
+                     class="neon neon-rosa font-quadro flex-1 min-w-0 bg-transparent text-[24px] sm:text-[30px] leading-tight py-1 outline-none focus:outline-none focus-visible:outline-none">
+              <button type="submit" class="shrink-0 inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl text-sm font-bold bg-white/10 text-white hover:bg-white/20 transition-colors">
+                {% include 'partials/icon.html' with nome='edit' classe='w-4 h-4' %}
+                <span class="hidden sm:inline">Escrever</span><span class="sr-only sm:hidden">Escrever</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bandeja: cor da caneta, desfazer e limpar -->
+      <div class="mx-4 sm:mx-8 flex items-center gap-3 sm:gap-4 px-4 sm:px-5 pt-4 pb-3 rounded-b-2xl bg-gradient-to-b from-[#3a3a44] to-[#25252d] shadow-md">
+        <fieldset class="flex items-center gap-x-3 gap-y-2 sm:gap-4 flex-wrap min-w-0">
+          <legend class="sr-only">Cor da caneta</legend>
+          {% for valor, rotulo in cores %}
+          <label class="cursor-pointer py-1 pl-2" title="Caneta {{ rotulo|lower }}">
+            <input type="radio" name="cor" value="{{ valor }}" class="sr-only" {% if forloop.first %}checked{% endif %}>
+            <span class="caneta-corpo neon-{{ valor }}" aria-hidden="true"></span>
+            <span class="sr-only">{{ rotulo }}</span>
+          </label>
+          {% endfor %}
+        </fieldset>
+        <span class="flex-1"></span>
+        <button type="button" id="desfazer-traco" title="Desfazer o seu último traço (Ctrl+Z)"
+                class="hidden shrink-0 items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+          {% include 'partials/icon.html' with nome='undo' classe='w-4 h-4' %}
+          <span class="sr-only">Desfazer traço</span>
+        </button>
+        <button type="button" id="botao-limpar" class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+          {% include 'partials/icon.html' with nome='trash' classe='w-4 h-4' %}
+          <span class="hidden sm:inline">Limpar quadro</span><span class="sr-only sm:hidden">Limpar quadro</span>
+        </button>
+      </div>
     </div>
   </section>
 
@@ -140,7 +252,7 @@
         </button>
         <p id="estado-notificacoes" class="text-xs text-gray-500 leading-relaxed"></p>
       </div>
-      <p class="text-[11px] text-gray-400 leading-relaxed">Para receber os avisos, deixe o sistema aberto em alguma aba. O navegador só libera o som depois que você clica em algo na página.</p>
+      <p class="text-[11px] text-gray-400 leading-relaxed">Para receber os avisos, deixe o sistema aberto em alguma aba. O navegador só libera o som depois que você clica em algo na página. O texto digitado é lido em voz alta; o desenho aparece na tela.</p>
     </section>
   </aside>
 </div>
@@ -154,8 +266,17 @@
       <p id="avisar-destino" class="text-sm text-gray-500 mt-1"></p>
     </div>
     <fieldset class="px-5">
-      <legend class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">O que será lido</legend>
-      <div id="avisar-linhas" class="flex flex-col gap-1 max-h-[45vh] overflow-y-auto rounded-xl bg-[#09090e] p-2"></div>
+      <legend class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">O que vai no aviso</legend>
+      <div class="flex flex-col gap-1 max-h-[50vh] overflow-y-auto rounded-xl bg-[#09090e] p-2">
+        <div id="avisar-linhas" class="flex flex-col gap-1"></div>
+        <label id="avisar-desenho" class="hidden flex-col gap-2 px-2 py-2 rounded-lg hover:bg-white/5 cursor-pointer">
+          <span class="flex items-center gap-3 text-xs font-semibold text-white/70">
+            <input type="checkbox" id="avisar-incluir-desenho" checked class="w-4 h-4 shrink-0 accent-[#E94920]">
+            Incluir o desenho (aparece na tela, mas não é lido em voz alta)
+          </span>
+          <span data-previa class="block rounded-lg bg-black/40 ring-1 ring-white/10 p-1"></span>
+        </label>
+      </div>
     </fieldset>
     <p id="avisar-erro" class="hidden mx-5 mt-3 text-xs font-semibold text-red-600" role="alert"></p>
     <div class="flex justify-end gap-2 px-5 py-4 mt-2 border-t border-gray-100">
@@ -174,7 +295,7 @@
   <form method="dialog" class="flex flex-col">
     <div class="px-5 pt-5 pb-4">
       <h2 id="dialogo-limpar-titulo" class="text-base font-bold text-[#50443C]">Limpar o quadro?</h2>
-      <p class="text-sm text-gray-500 mt-1">Todas as linhas somem para todo mundo. Dá para desfazer logo em seguida.</p>
+      <p class="text-sm text-gray-500 mt-1">Todas as linhas e desenhos somem para todo mundo. Dá para desfazer logo em seguida.</p>
     </div>
     <div class="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
       <button type="submit" value="cancelar" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors">Cancelar</button>
@@ -204,26 +325,43 @@
     escrever: '{% url "quadro_escrever" %}',
     editar: '{% url "quadro_editar" 0 %}',
     apagar: '{% url "quadro_apagar" 0 %}',
+    desenhar: '{% url "quadro_desenhar" %}',
+    tracos: '{% url "quadro_tracos" %}',
+    apagarTracos: '{% url "quadro_apagar_tracos" %}',
     limpar: '{% url "quadro_limpar" %}',
     restaurar: '{% url "quadro_restaurar" %}',
     avisar: '{% url "quadro_avisar" %}',
   };
   function urlCom(modelo, id) { return modelo.replace('/0/', '/' + id + '/'); }
+  var ao = window.QuadroAoVivo;
+  var LARGURA = ao.LARGURA, MAX_VALORES_TRACO = 4000, SVG_NS = 'http://www.w3.org/2000/svg';
   var CORES = JSON.parse(document.getElementById('cores-quadro').textContent);
   var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
-  var ao = window.QuadroAoVivo;
 
   var estado = JSON.parse(document.getElementById('estado-inicial').textContent);
   var conectados = estado.conectados || [];
+  var cacheTracos = {};          // id -> {id, cor, pontos}; traços nunca mudam, então ficam guardados
+  (estado.dados_tracos || []).forEach(function (t) { cacheTracos[t.id] = t; });
+  delete estado.dados_tracos;
+  var elementosTraco = {};       // id -> [brilho, núcleo, alvo do apagador]
+  var meusTracos = [];           // traços feitos aqui, para "Desfazer traço"
   var editando = null;           // id da linha em edição
   var ultimaMudanca = 0;         // respostas de consultas anteriores a isso são ignoradas
   var primeiraVez = true;
+  var ferramenta = 'texto';
 
+  var secao = document.getElementById('secao-quadro');
+  var area = document.getElementById('area');
   var lista = document.getElementById('linhas');
   var vazio = document.getElementById('vazio');
+  var svg = document.getElementById('desenho');
+  var gBrilho = document.getElementById('g-brilho'), gNucleo = document.getElementById('g-nucleo');
+  var gAlvo = document.getElementById('g-alvo'), gVivo = document.getElementById('g-vivo');
   var form = document.getElementById('form-escrever');
   var entrada = document.getElementById('nova-linha');
   var botaoAvisar = document.getElementById('botao-avisar');
+  var botaoDesfazer = document.getElementById('desfazer-traco');
+  var caixaToasts = document.getElementById('toasts');
 
   function el(tag, classe, texto) {
     var e = document.createElement(tag);
@@ -233,6 +371,7 @@
   }
   function icone(nome) { return document.getElementById('tpl-icone-' + nome).content.cloneNode(true); }
   function corEscolhida() { var r = document.querySelector('input[name=cor]:checked'); return r ? r.value : 'rosa'; }
+  function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }
 
   // ---------- comunicação ----------
   function enviar(url, corpo) {
@@ -262,6 +401,7 @@
     }
     if (d.conectados) { conectados = d.conectados; renderConectados(); }
   }
+  function mudou(d) { ultimaMudanca = Date.now(); aplicar(d); }
 
   ao.assinar(estado.versao, function (d, inicio) {
     if (inicio < ultimaMudanca) { delete d.quadro; }  // resposta antiga, chegou depois de uma alteração nossa
@@ -282,29 +422,40 @@
     if (s === 'sessao') toast('Sua sessão expirou. Recarregue a página e entre de novo.', 'erro');
   };
 
-  // ---------- quadro ----------
+  // ---------- desenho do quadro inteiro ----------
+  function render() {
+    renderLinhas();
+    renderTracos();
+    var vazioAgora = !estado.anotacoes.length && !estado.tracos.length;
+    vazio.hidden = !vazioAgora;
+    botaoAvisar.setAttribute('aria-disabled', vazioAgora ? 'true' : 'false');
+    botaoAvisar.title = vazioAgora ? 'Escreva ou desenhe algo no quadro antes de avisar' : '';
+    renderAvisos();
+    atualizarDesfazer();
+    primeiraVez = false;
+  }
+
+  // ---------- linhas de texto ----------
   function assinatura(a) { return JSON.stringify(a); }
 
   function criarLinha(a) {
-    var li = el('li', 'group flex items-start gap-2 sm:gap-3 rounded-2xl px-2 sm:px-3 py-1 hover:bg-white/[.035] transition-colors');
+    var li = el('li', 'linha');
     li.dataset.id = a.id;
     li.dataset.assinatura = assinatura(a);
-    var corpo = el('div', 'flex-1 min-w-0');
-    var texto = el('p', 'neon neon-' + a.cor + ' font-quadro text-[28px] sm:text-[36px] leading-[1.15] break-words', a.texto);
+    var texto = el('p', 'linha-texto neon neon-' + a.cor + ' font-quadro', a.texto);
     texto.title = 'Clique duas vezes para editar';
     texto.dataset.editar = '';
-    corpo.appendChild(texto);
-    var info = a.autor + ' · ' + ao.formatarHora(a.criado_em);
-    if (a.editado_por) info += '  ·  editado por ' + a.editado_por + ' às ' + ao.formatarHora(a.editado_em);
-    corpo.appendChild(el('p', 'text-[11px] font-medium text-white/35 mt-0.5 mb-1', info));
-    li.appendChild(corpo);
+    li.appendChild(texto);
 
-    var acoes = el('div', 'flex items-center gap-0.5 pt-2 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity');
-    var editar = el('button', 'p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10');
+    var acoes = el('div', 'linha-acoes');
+    var info = a.autor + ' · ' + ao.formatarHora(a.criado_em);
+    if (a.editado_por) info += ' · editado por ' + a.editado_por + ' às ' + ao.formatarHora(a.editado_em);
+    acoes.appendChild(el('span', 'linha-meta px-2 py-1 rounded-lg bg-black/75 text-[11px] font-medium text-white/60 whitespace-nowrap', info));
+    var editar = el('button', 'p-1.5 rounded-lg bg-black/60 text-white/60 hover:text-white hover:bg-white/15');
     editar.type = 'button'; editar.dataset.botaoEditar = '';
     editar.setAttribute('aria-label', 'Editar: ' + a.texto);
     editar.appendChild(icone('editar'));
-    var apagar = el('button', 'p-2 rounded-lg text-white/50 hover:text-red-300 hover:bg-red-500/10');
+    var apagar = el('button', 'p-1.5 rounded-lg bg-black/60 text-white/60 hover:text-red-300 hover:bg-red-500/20');
     apagar.type = 'button'; apagar.dataset.botaoApagar = '';
     apagar.setAttribute('aria-label', 'Apagar: ' + a.texto);
     apagar.appendChild(icone('apagar'));
@@ -313,7 +464,7 @@
     return li;
   }
 
-  function render() {
+  function renderLinhas() {
     var anotacoes = estado.anotacoes;
     var atuais = {};
     Array.prototype.forEach.call(lista.children, function (li) { atuais[li.dataset.id] = li; });
@@ -333,16 +484,277 @@
     // Remove o que saiu e ajusta a ordem sem tirar do lugar a linha em edição (manteria o foco)
     Object.keys(atuais).forEach(function (id) { if (desejados.indexOf(atuais[id]) < 0) atuais[id].remove(); });
     desejados.forEach(function (li, i) { if (lista.children[i] !== li) lista.insertBefore(li, lista.children[i] || null); });
-
-    vazio.classList.toggle('hidden', anotacoes.length > 0);
-    vazio.classList.toggle('flex', anotacoes.length === 0);
-    var semLinhas = anotacoes.length === 0;
-    botaoAvisar.setAttribute('aria-disabled', semLinhas ? 'true' : 'false');
-    botaoAvisar.title = semLinhas ? 'Escreva algo no quadro antes de avisar' : '';
-    renderAvisos();
-    primeiraVez = false;
   }
 
+  // ---------- traços ----------
+  function renderTracos() {
+    var ativos = {};
+    estado.tracos.forEach(function (id) { ativos[id] = true; });
+    Object.keys(elementosTraco).forEach(function (id) {
+      if (ativos[id]) return;
+      elementosTraco[id].forEach(function (e) { e.remove(); });
+      delete elementosTraco[id];
+    });
+    var faltam = [];
+    estado.tracos.forEach(function (id) {
+      if (elementosTraco[id]) return;
+      var t = cacheTracos[id];
+      if (!t) { faltam.push(id); return; }
+      var brilho = ao.criarTraco(t.cor, t.pontos, 'traco-brilho');
+      var nucleo = ao.criarTraco(t.cor, t.pontos, 'traco-nucleo');
+      var alvo = ao.criarTraco(t.cor, t.pontos, 'traco-alvo');
+      alvo.dataset.traco = id;
+      gBrilho.appendChild(brilho); gNucleo.appendChild(nucleo); gAlvo.appendChild(alvo);
+      elementosTraco[id] = [brilho, nucleo, alvo];
+    });
+    if (faltam.length) buscarTracos(faltam);
+    ajustarAltura();
+  }
+
+  // Busca só os traços que este navegador ainda não tem
+  var buscando = {};
+  function buscarTracos(ids) {
+    ids = ids.filter(function (id) { return !buscando[id]; });
+    for (var i = 0; i < ids.length; i += 150) {
+      (function (lote) {
+        lote.forEach(function (id) { buscando[id] = true; });
+        fetch(URLS.tracos + '?ids=' + lote.join(','), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+          .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+          .then(function (d) { d.tracos.forEach(function (t) { cacheTracos[t.id] = t; }); })
+          .catch(function () {})
+          .then(function () {
+            lote.forEach(function (id) { delete buscando[id]; });
+            var aindaFaltam = lote.some(function (id) { return !cacheTracos[id] && estado.tracos.indexOf(id) >= 0; });
+            if (aindaFaltam) setTimeout(renderTracos, 3000); else renderTracos();
+          });
+      })(ids.slice(i, i + 150));
+    }
+  }
+
+  // O quadro cresce para baixo se houver desenho além da altura padrão
+  function alturaDoTraco(t) {
+    if (t.maxY == null) { t.maxY = 0; for (var i = 1; i < t.pontos.length; i += 2) t.maxY = Math.max(t.maxY, t.pontos[i]); }
+    return t.maxY;
+  }
+  function ajustarAltura() {
+    var maxY = 0;
+    estado.tracos.forEach(function (id) { if (cacheTracos[id]) maxY = Math.max(maxY, alturaDoTraco(cacheTracos[id])); });
+    area.style.minHeight = maxY ? 'max(56.25cqw, ' + ((maxY + 300) / 100).toFixed(2) + 'cqw)' : '';
+  }
+
+  // Mesmas unidades em x e y: a largura do quadro vale LARGURA
+  function ajustarViewBox() {
+    var w = area.clientWidth, h = area.clientHeight;
+    if (w) svg.setAttribute('viewBox', '0 0 ' + LARGURA + ' ' + Math.round(h / w * LARGURA));
+  }
+  if (window.ResizeObserver) new ResizeObserver(ajustarViewBox).observe(area);
+  else window.addEventListener('resize', ajustarViewBox);
+  ajustarViewBox();
+
+  // ---------- caneta e apagador ----------
+  function pontoDo(e) {
+    var r = area.getBoundingClientRect(), escala = LARGURA / r.width;
+    var x = Math.round((e.clientX - r.left) * escala), y = Math.round((e.clientY - r.top) * escala);
+    return [Math.max(0, Math.min(LARGURA, x)), Math.max(0, Math.min(Math.round(r.height * escala), y))];
+  }
+
+  // Ramer-Douglas-Peucker: tira pontos que não mudam o formato do traço
+  function simplificar(p, tolerancia) {
+    var n = p.length / 2;
+    if (n <= 2) return p.slice();
+    var manter = new Uint8Array(n), pilha = [[0, n - 1]];
+    manter[0] = manter[n - 1] = 1;
+    while (pilha.length) {
+      var par = pilha.pop(), a = par[0], b = par[1];
+      var ax = p[2 * a], ay = p[2 * a + 1], dx = p[2 * b] - ax, dy = p[2 * b + 1] - ay;
+      var comprimento = Math.hypot(dx, dy), maior = 0, indice = -1;
+      for (var i = a + 1; i < b; i++) {
+        var px = p[2 * i] - ax, py = p[2 * i + 1] - ay;
+        var dist = comprimento ? Math.abs(dy * px - dx * py) / comprimento : Math.hypot(px, py);
+        if (dist > maior) { maior = dist; indice = i; }
+      }
+      if (maior > tolerancia) { manter[indice] = 1; pilha.push([a, indice], [indice, b]); }
+    }
+    var saida = [];
+    for (var j = 0; j < n; j++) if (manter[j]) saida.push(p[2 * j], p[2 * j + 1]);
+    return saida;
+  }
+
+  var vivo = null;       // traço sendo desenhado agora
+  var apagando = null;   // ids marcados pelo apagador
+  var quadroAgendado = false;
+
+  function novoTracoVivo(pontos, pointerId) {
+    var cor = corEscolhida();
+    vivo = { cor: cor, pontos: pontos, pointerId: pointerId,
+             brilho: ao.criarTraco(cor, pontos, 'traco-vivo-brilho'), nucleo: ao.criarTraco(cor, pontos, 'traco-nucleo') };
+    gVivo.appendChild(vivo.brilho); gVivo.appendChild(vivo.nucleo);
+  }
+
+  function redesenharVivo() {
+    if (quadroAgendado) return;
+    quadroAgendado = true;
+    requestAnimationFrame(function () {
+      quadroAgendado = false;
+      if (!vivo) return;
+      var d = ao.caminho(vivo.pontos);
+      vivo.brilho.setAttribute('d', d); vivo.nucleo.setAttribute('d', d);
+    });
+  }
+
+  function terminarTraco() {
+    var t = vivo;
+    vivo = null;
+    if (!t) return;
+    var pontos = t.pontos, tolerancia = 6;
+    do { pontos = simplificar(t.pontos, tolerancia); tolerancia *= 2; } while (pontos.length > MAX_VALORES_TRACO);
+    if (pontos.length === 2) pontos = pontos.concat(pontos);  // um clique vira um ponto
+    var d = ao.caminho(pontos);
+    t.brilho.setAttribute('d', d); t.nucleo.setAttribute('d', d);
+    enviar(URLS.desenhar, { cor: t.cor, pontos: pontos })
+      .then(function (resp) {
+        cacheTracos[resp.id] = { id: resp.id, cor: t.cor, pontos: pontos };
+        meusTracos.push(resp.id);
+        mudou(resp);
+      })
+      .catch(function (err) { toast(err.message, 'erro'); })
+      .then(function () { t.brilho.remove(); t.nucleo.remove(); });
+  }
+
+  function marcarParaApagar(e) {
+    document.elementsFromPoint(e.clientX, e.clientY).forEach(function (alvo) {
+      var id = alvo.dataset && alvo.dataset.traco;
+      if (!id || apagando[id] || !elementosTraco[id]) return;
+      apagando[id] = true;
+      elementosTraco[id].forEach(function (x) { x.classList.add('apagando'); });
+    });
+  }
+
+  function terminarApagador() {
+    var ids = Object.keys(apagando || {}).map(Number);
+    apagando = null;
+    if (!ids.length) return;
+    apagarTracos(ids, true);
+  }
+
+  function apagarTracos(ids, comDesfazer) {
+    return enviar(URLS.apagarTracos, { ids: ids })
+      .then(function (d) {
+        mudou(d);
+        var n = (d.tracos_apagados || []).length;
+        if (comDesfazer && n) toastDesfazer(n === 1 ? 'Traço apagado.' : plural(n, 'traço', 'traços') + ' apagados.', { tracos: d.tracos_apagados });
+      })
+      .catch(function (err) {
+        toast(err.message, 'erro');
+        ids.forEach(function (id) { (elementosTraco[id] || []).forEach(function (x) { x.classList.remove('apagando'); }); });
+      });
+  }
+
+  svg.addEventListener('pointerdown', function (e) {
+    if (ferramenta === 'texto' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (vivo || apagando) return;
+    e.preventDefault();
+    try { svg.setPointerCapture(e.pointerId); } catch (erro) {}
+    if (ferramenta === 'caneta') { novoTracoVivo(pontoDo(e), e.pointerId); redesenharVivo(); }
+    else { apagando = {}; marcarParaApagar(e); }
+  });
+  svg.addEventListener('pointermove', function (e) {
+    var eventos = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
+    if (!eventos.length) eventos = [e];
+    if (vivo && e.pointerId === vivo.pointerId) {
+      eventos.forEach(function (ev) {
+        var p = pontoDo(ev), n = vivo.pontos.length;
+        if (Math.hypot(p[0] - vivo.pontos[n - 2], p[1] - vivo.pontos[n - 1]) < 5) return;
+        vivo.pontos.push(p[0], p[1]);
+      });
+      // Traço muito longo: fecha este e continua em um novo, do mesmo ponto
+      if (vivo.pontos.length > MAX_VALORES_TRACO * 3) {
+        var ultimo = vivo.pontos.slice(-2), id = vivo.pointerId;
+        terminarTraco();
+        novoTracoVivo(ultimo, id);
+      }
+      redesenharVivo();
+    } else if (apagando) {
+      eventos.forEach(marcarParaApagar);
+    }
+  });
+  function soltar(e) {
+    if (vivo && e.pointerId === vivo.pointerId) terminarTraco();
+    else if (apagando) terminarApagador();
+  }
+  svg.addEventListener('pointerup', soltar);
+  svg.addEventListener('pointercancel', soltar);
+
+  // ---------- ferramentas ----------
+  var botoesFerramenta = document.querySelectorAll('[data-ferramenta]');
+  function escolherFerramenta(f) {
+    ferramenta = f;
+    secao.classList.remove('modo-texto', 'modo-caneta', 'modo-apagador');
+    secao.classList.add('modo-' + f);
+    botoesFerramenta.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.ferramenta === f ? 'true' : 'false'); });
+    if (f !== 'texto' && editando !== null) fecharEdicao();
+    atualizarDesfazer();
+  }
+  botoesFerramenta.forEach(function (b) {
+    b.addEventListener('click', function () { escolherFerramenta(b.dataset.ferramenta); });
+  });
+
+  function meuUltimoTraco() {
+    while (meusTracos.length && estado.tracos.indexOf(meusTracos[meusTracos.length - 1]) < 0) meusTracos.pop();
+    return meusTracos[meusTracos.length - 1];
+  }
+  function atualizarDesfazer() {
+    var mostrar = !!meuUltimoTraco();
+    botaoDesfazer.classList.toggle('hidden', !mostrar);
+    botaoDesfazer.classList.toggle('inline-flex', mostrar);
+  }
+  function desfazerTraco() {
+    var id = meuUltimoTraco();
+    if (!id) return;
+    meusTracos.pop();
+    (elementosTraco[id] || []).forEach(function (x) { x.classList.add('apagando'); });
+    apagarTracos([id], false);
+  }
+  botaoDesfazer.addEventListener('click', desfazerTraco);
+  document.addEventListener('keydown', function (e) {
+    var alvo = e.target, digitando = alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.isContentEditable);
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !digitando && meuUltimoTraco()) {
+      e.preventDefault();
+      desfazerTraco();
+    }
+  });
+
+  // ---------- expandir ----------
+  var botaoExpandir = document.getElementById('botao-expandir');
+  var expandido = false;
+  function expandir(ativar) {
+    if (ativar === expandido) return;
+    expandido = ativar;
+    secao.classList.toggle('quadro-expandido', ativar);
+    document.documentElement.style.overflow = ativar ? 'hidden' : '';
+    botaoExpandir.setAttribute('aria-pressed', ativar ? 'true' : 'false');
+    botaoExpandir.querySelector('[data-icone-expandir]').classList.toggle('hidden', ativar);
+    botaoExpandir.querySelector('[data-icone-recolher]').classList.toggle('hidden', !ativar);
+    botaoExpandir.querySelector('[data-expandir-texto]').textContent = ativar ? 'Sair da tela cheia' : 'Expandir';
+    botaoExpandir.setAttribute('aria-label', ativar ? 'Sair da tela cheia' : 'Expandir o quadro');
+    (ativar ? secao : document.body).appendChild(caixaToasts);  // em tela cheia só a seção aparece
+    if (ativar && secao.requestFullscreen && !document.fullscreenElement) {
+      secao.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
+    } else if (!ativar && document.fullscreenElement) {
+      document.exitFullscreen().catch(function () {});
+    }
+  }
+  botaoExpandir.addEventListener('click', function () { expandir(!expandido); });
+  document.addEventListener('fullscreenchange', function () {
+    if (!document.fullscreenElement && expandido) expandir(false);  // saiu com Esc
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && expandido && !document.fullscreenElement && editando === null && !document.querySelector('dialog[open]')) {
+      expandir(false);
+    }
+  });
+
+  // ---------- lateral ----------
   function renderConectados() {
     var ul = document.getElementById('conectados');
     ul.replaceChildren();
@@ -368,7 +780,8 @@
         caixa.appendChild(el('p', 'neon neon-fraco neon-' + l.cor + ' font-quadro text-xl leading-snug break-words', l.texto));
       });
       var resto = a.linhas.length - 3;
-      if (resto > 0) caixa.appendChild(el('p', 'text-[11px] text-white/40', '+ ' + resto + (resto === 1 ? ' linha' : ' linhas')));
+      if (resto > 0) caixa.appendChild(el('p', 'text-[11px] text-white/40', '+ ' + plural(resto, 'linha', 'linhas')));
+      if (a.tem_desenho) caixa.appendChild(el('p', 'text-[11px] font-semibold text-orange-300/80 py-0.5', a.linhas.length ? '+ desenho' : 'Desenho'));
       li.appendChild(caixa);
       ul.appendChild(li);
     });
@@ -382,7 +795,7 @@
     r.addEventListener('change', function () {
       pintarEntrada();
       try { localStorage.setItem('quadro.cor', r.value); } catch (e) {}
-      entrada.focus();
+      if (ferramenta === 'texto') entrada.focus();
     });
   });
   try {
@@ -398,11 +811,7 @@
     if (enviando) return;
     enviando = true;
     enviar(URLS.escrever, { texto: texto, cor: corEscolhida() })
-      .then(function (d) {
-        entrada.value = '';
-        ultimaMudanca = Date.now();
-        aplicar(d);
-      })
+      .then(function (d) { entrada.value = ''; mudou(d); })
       .catch(function (err) { toast(err.message, 'erro'); })
       .then(function () { enviando = false; entrada.focus(); });
   });
@@ -411,13 +820,13 @@
     alvo.classList.remove('tremer'); void alvo.offsetWidth; alvo.classList.add('tremer');
   }
 
-  // ---------- editar e apagar ----------
+  // ---------- editar e apagar linhas ----------
   lista.addEventListener('click', function (e) {
     var li = e.target.closest('li[data-id]');
     if (!li) return;
     var id = Number(li.dataset.id);
     if (e.target.closest('[data-botao-editar]')) abrirEdicao(li, id);
-    else if (e.target.closest('[data-botao-apagar]')) apagar(id);
+    else if (e.target.closest('[data-botao-apagar]')) apagarLinha(id);
   });
   lista.addEventListener('dblclick', function (e) {
     var alvo = e.target.closest('[data-editar]');
@@ -430,9 +839,9 @@
     if (!a) return;
     editando = id;
     li.dataset.assinatura = '';
-    var f = el('form', 'flex-1 min-w-0 flex flex-col gap-2 py-1');
+    var f = el('form', 'flex flex-col gap-2 py-1');
     f.noValidate = true;
-    var campo = el('input', 'neon neon-' + a.cor + ' font-quadro w-full bg-white/[.04] rounded-xl px-2 text-[28px] sm:text-[36px] leading-tight outline-none ring-1 ring-white/20 focus:ring-white/50');
+    var campo = el('input', 'linha-edicao neon neon-' + a.cor + ' font-quadro w-full bg-white/[.04] rounded-xl px-2 outline-none ring-1 ring-white/20 focus:ring-white/50');
     campo.value = a.texto; campo.maxLength = {{ max_texto }};
     campo.setAttribute('aria-label', 'Texto da linha');
     f.appendChild(campo);
@@ -441,28 +850,29 @@
     var cores = el('div', 'flex items-center gap-1.5 mr-auto');
     cores.setAttribute('role', 'radiogroup'); cores.setAttribute('aria-label', 'Cor da linha');
     var corAtual = a.cor;
+    function marcar() {
+      cores.querySelectorAll('button').forEach(function (x) {
+        var ativo = x.dataset.cor === corAtual;
+        x.setAttribute('aria-checked', ativo ? 'true' : 'false');
+        x.classList.toggle('ring-white', ativo); x.classList.toggle('ring-transparent', !ativo);
+        x.classList.toggle('scale-110', ativo);
+      });
+    }
     CORES.forEach(function (c) {
       var b = el('button', 'neon-' + c[0] + ' w-6 h-6 rounded-full ring-2 ring-offset-2 ring-offset-[#07070c] transition-transform');
       b.type = 'button';
+      b.dataset.cor = c[0];
       b.style.background = 'var(--neon)';
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-label', c[1]);
-      function marcar() {
-        cores.querySelectorAll('button').forEach(function (x) {
-          var ativo = x === b;
-          x.setAttribute('aria-checked', ativo ? 'true' : 'false');
-          x.classList.toggle('ring-white', ativo); x.classList.toggle('ring-transparent', !ativo);
-          x.classList.toggle('scale-110', ativo);
-        });
-      }
       b.addEventListener('click', function () {
         corAtual = c[0]; marcar();
         campo.className = campo.className.replace(/neon-\w+/, 'neon-' + corAtual);
         campo.focus();
       });
       cores.appendChild(b);
-      if (c[0] === a.cor) setTimeout(marcar);
     });
+    marcar();
     barra.appendChild(cores);
     var cancelar = el('button', 'px-3 py-1.5 rounded-lg text-xs font-semibold text-white/60 hover:text-white hover:bg-white/10', 'Cancelar');
     cancelar.type = 'button';
@@ -472,13 +882,13 @@
     barra.appendChild(cancelar); barra.appendChild(salvar);
     f.appendChild(barra);
 
-    campo.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); fecharEdicao(); } });
+    campo.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fecharEdicao(); } });
     f.addEventListener('submit', function (e) {
       e.preventDefault();
       var texto = campo.value.trim();
       if (!texto) { tremer(campo); return; }
       enviar(urlCom(URLS.editar, id), { texto: texto, cor: corAtual })
-        .then(function (d) { editando = null; ultimaMudanca = Date.now(); aplicar(d); focarLinha(id); })
+        .then(function (d) { editando = null; mudou(d); focarLinha(id); })
         .catch(function (err) {
           toast(err.message, 'erro');
           if (err.status === 404) fecharEdicao();
@@ -502,12 +912,11 @@
     if (b) b.focus({ preventScroll: true });
   }
 
-  function apagar(id) {
+  function apagarLinha(id) {
     enviar(urlCom(URLS.apagar, id))
       .then(function (d) {
-        ultimaMudanca = Date.now();
-        aplicar(d);
-        if (d.apagadas && d.apagadas.length) toastDesfazer('Linha apagada.', d.apagadas);
+        mudou(d);
+        if (d.apagadas && d.apagadas.length) toastDesfazer('Linha apagada.', { ids: d.apagadas });
         entrada.focus({ preventScroll: true });
       })
       .catch(function (err) { toast(err.message, 'erro'); });
@@ -516,7 +925,7 @@
   // ---------- limpar ----------
   var dialogoLimpar = document.getElementById('dialogo-limpar');
   document.getElementById('botao-limpar').addEventListener('click', function () {
-    if (!estado.anotacoes.length) { toast('O quadro já está limpo.', 'ok'); return; }
+    if (!estado.anotacoes.length && !estado.tracos.length) { toast('O quadro já está limpo.', 'ok'); return; }
     dialogoLimpar.showModal();
   });
   dialogoLimpar.addEventListener('close', function () {
@@ -524,22 +933,25 @@
     dialogoLimpar.returnValue = '';
     enviar(URLS.limpar)
       .then(function (d) {
-        ultimaMudanca = Date.now();
-        aplicar(d);
-        if (d.apagadas && d.apagadas.length) toastDesfazer('Quadro limpo.', d.apagadas);
+        mudou(d);
+        if ((d.apagadas || []).length || (d.tracos_apagados || []).length) {
+          toastDesfazer('Quadro limpo.', { ids: d.apagadas, tracos: d.tracos_apagados });
+        }
       })
       .catch(function (err) { toast(err.message, 'erro'); });
   });
 
-  function desfazer(ids) {
-    return enviar(URLS.restaurar, { ids: ids })
-      .then(function (d) { ultimaMudanca = Date.now(); aplicar(d); })
+  function desfazer(oQue) {
+    return enviar(URLS.restaurar, oQue)
+      .then(mudou)
       .catch(function (err) { toast(err.message, 'erro'); });
   }
 
   // ---------- avisar ----------
   var dialogoAvisar = document.getElementById('dialogo-avisar');
   var linhasAvisar = document.getElementById('avisar-linhas');
+  var blocoDesenho = document.getElementById('avisar-desenho');
+  var incluirDesenho = document.getElementById('avisar-incluir-desenho');
   var erroAvisar = document.getElementById('avisar-erro');
   var confirmarAvisar = document.getElementById('confirmar-avisar');
 
@@ -550,14 +962,14 @@
   }
 
   botaoAvisar.addEventListener('click', function () {
-    if (!estado.anotacoes.length) {
-      toast('Escreva algo no quadro antes de avisar.', 'erro');
-      tremer(entrada); entrada.focus();
+    if (!estado.anotacoes.length && !estado.tracos.length) {
+      toast('Escreva ou desenhe algo no quadro antes de avisar.', 'erro');
+      tremer(entrada);
       return;
     }
     var outros = conectados.filter(function (c) { return !c.voce; }).map(function (c) { return c.nome; });
     document.getElementById('avisar-destino').textContent = outros.length
-      ? 'Vai aparecer na tela e ser lido em voz alta para ' + (outros.length === 1 ? '1 pessoa' : outros.length + ' pessoas') + ': ' + nomesEmTexto(outros) + '.'
+      ? 'Vai aparecer na tela de ' + plural(outros.length, 'pessoa', 'pessoas') + ' (' + nomesEmTexto(outros) + '), com o texto lido em voz alta.'
       : 'Ninguém mais está conectado agora. Quem abrir o sistema nos próximos 10 minutos recebe o aviso.';
     linhasAvisar.replaceChildren();
     estado.anotacoes.forEach(function (a) {
@@ -568,6 +980,13 @@
       rotulo.appendChild(el('span', 'neon neon-' + a.cor + ' font-quadro text-2xl leading-tight break-words min-w-0', a.texto));
       linhasAvisar.appendChild(rotulo);
     });
+    var tracos = estado.tracos.map(function (id) { return cacheTracos[id]; }).filter(Boolean);
+    blocoDesenho.classList.toggle('hidden', !tracos.length);
+    blocoDesenho.classList.toggle('flex', !!tracos.length);
+    incluirDesenho.checked = true;
+    var previa = blocoDesenho.querySelector('[data-previa]');
+    previa.replaceChildren();
+    if (tracos.length) previa.appendChild(ao.previa(tracos));
     erroAvisar.classList.add('hidden');
     dialogoAvisar.showModal();
     confirmarAvisar.focus();
@@ -577,20 +996,20 @@
     if (e.submitter && e.submitter.value !== 'avisar') return;  // Cancelar fecha normalmente
     e.preventDefault();
     var ids = Array.prototype.map.call(linhasAvisar.querySelectorAll('input:checked'), function (c) { return Number(c.value); });
-    if (!ids.length) {
-      erroAvisar.textContent = 'Marque pelo menos uma linha.';
+    var desenho = !blocoDesenho.classList.contains('hidden') && incluirDesenho.checked;
+    if (!ids.length && !desenho) {
+      erroAvisar.textContent = 'Marque pelo menos uma linha ou o desenho.';
       erroAvisar.classList.remove('hidden');
       return;
     }
     if (confirmarAvisar.hasAttribute('data-carregando')) return;
     confirmarAvisar.setAttribute('data-carregando', '');
-    enviar(URLS.avisar, { ids: ids })
+    enviar(URLS.avisar, { ids: ids, desenho: desenho })
       .then(function (d) {
         dialogoAvisar.close();
-        ultimaMudanca = Date.now();
-        aplicar(d);
+        mudou(d);
         toast(d.avisados
-          ? 'Aviso enviado para ' + (d.avisados === 1 ? '1 pessoa conectada.' : d.avisados + ' pessoas conectadas.')
+          ? 'Aviso enviado para ' + plural(d.avisados, 'pessoa conectada.', 'pessoas conectadas.')
           : 'Aviso enviado. Ninguém mais está conectado agora; quem entrar nos próximos 10 minutos vai receber.', 'ok');
       })
       .catch(function (err) {
@@ -628,7 +1047,6 @@
   atualizarNotificacoes();
 
   // ---------- toasts ----------
-  var caixaToasts = document.getElementById('toasts');
   function toast(mensagem, tipo, acao) {
     var erro = tipo === 'erro';
     var t = el('div', 'toast flex items-center gap-3 pl-4 pr-2 py-3 rounded-2xl border shadow-lg text-sm font-medium bg-white ' +
@@ -655,8 +1073,8 @@
     caixaToasts.appendChild(t);
     setTimeout(fechar, acao ? 8000 : (erro ? 7000 : 5000));
   }
-  function toastDesfazer(mensagem, ids) {
-    toast(mensagem, 'ok', { rotulo: 'Desfazer', executar: function () { desfazer(ids); } });
+  function toastDesfazer(mensagem, oQue) {
+    toast(mensagem, 'ok', { rotulo: 'Desfazer', executar: function () { desfazer(oQue); } });
   }
 
   render();

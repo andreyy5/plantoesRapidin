@@ -601,3 +601,88 @@ class QuadroNocTests(TestCase):
         resp = self.client.get(reverse('minhas_trocas'))
         self.assertContains(resp, reverse('quadro'))
         self.assertContains(resp, reverse('quadro_novidades'))
+
+    # ----- desenho à mão -----
+
+    def _desenhar(self, pontos=(100, 200, 300, 400, 500, 450), cor='ciano', user=None):
+        return self._post('quadro_desenhar', {'cor': cor, 'pontos': list(pontos)}, user=user)
+
+    def test_desenhar_e_buscar_os_tracos(self):
+        versao = self._novidades(self.sac_user, versao='')['quadro']['versao']
+        resp = self._desenhar()
+        self.assertEqual(resp.status_code, 200)
+        traco_id = resp.json()['id']
+        self.assertEqual(resp.json()['quadro']['tracos'], [traco_id])
+
+        # Quem está no quadro percebe a mudança e busca só o traço novo
+        d = self._novidades(self.sac_user, versao=versao)
+        self.assertEqual(d['quadro']['tracos'], [traco_id])
+        self.assertTrue(d['tem_desenho'])
+        self.client.force_login(self.sac_user)
+        tracos = self.client.get(reverse('quadro_tracos'), {'ids': f'{traco_id},abc,999'}).json()['tracos']
+        self.assertEqual(tracos, [{'id': traco_id, 'cor': 'ciano', 'pontos': [100, 200, 300, 400, 500, 450]}])
+
+        # A página já vem com os traços desenhados
+        resp = self.client.get(reverse('quadro'))
+        self.assertEqual(resp.context['estado_inicial']['dados_tracos'][0]['id'], traco_id)
+
+    def test_clique_sem_arrastar_vira_um_ponto(self):
+        from .models import TracoQuadro
+        self._desenhar(pontos=(10, 20))
+        self.assertEqual(TracoQuadro.objects.get().pontos, [10, 20, 10, 20])
+
+    def test_pontos_invalidos_sao_recusados(self):
+        invalidos = [
+            [], [1, 2, 3], [-1, 5], [10001, 5], [5, 40001], ['1', 2], [1.5, 2], [True, 2],
+            list(range(0, 4002)),  # pontos demais
+        ]
+        for pontos in invalidos:
+            self.assertEqual(self._desenhar(pontos=pontos).status_code, 400, pontos)
+        self.assertEqual(self._post('quadro_desenhar', {'cor': 'ciano'}).status_code, 400)
+        resp = self._desenhar(cor='<b>')
+        self.assertEqual(resp.status_code, 200)
+        from .models import TracoQuadro
+        self.assertEqual(TracoQuadro.objects.get().cor, 'rosa')
+
+    def test_apagador_e_desfazer(self):
+        a = self._desenhar().json()['id']
+        b = self._desenhar(user=self.sac_user).json()['id']
+        resp = self._post('quadro_apagar_tracos', {'ids': [a, 9999]})
+        self.assertEqual(resp.json()['tracos_apagados'], [a])
+        self.assertEqual(resp.json()['quadro']['tracos'], [b])
+        resp = self._post('quadro_restaurar', {'tracos': [a]})
+        self.assertEqual(sorted(resp.json()['quadro']['tracos']), sorted([a, b]))
+
+    def test_limpar_apaga_texto_e_desenho_e_desfaz_tudo(self):
+        self._post('quadro_escrever', {'texto': 'A'})
+        self._desenhar()
+        resp = self._post('quadro_limpar').json()
+        self.assertEqual((resp['quadro']['anotacoes'], resp['quadro']['tracos']), ([], []))
+        self.assertFalse(self._novidades(self.sac_user)['tem_desenho'])
+        resp = self._post('quadro_restaurar', {'ids': resp['apagadas'], 'tracos': resp['tracos_apagados']}).json()
+        self.assertEqual((len(resp['quadro']['anotacoes']), len(resp['quadro']['tracos'])), (1, 1))
+
+    def test_aviso_so_com_desenho(self):
+        self._post('quadro_escrever', {'texto': 'não vai no aviso'})
+        self._desenhar(cor='verde')
+        resp = self._post('quadro_avisar', {'ids': [], 'desenho': True})
+        self.assertEqual(resp.status_code, 200)
+        d = self._novidades(self.sac_user, alerta=0)['alerta']
+        self.assertEqual(d['linhas'], [])
+        self.assertEqual(d['tracos'], [{'cor': 'verde', 'pontos': [100, 200, 300, 400, 500, 450]}])
+        # A lista de últimos avisos só diz que tem desenho (não carrega o desenho)
+        aviso = resp.json()['quadro']['avisos'][0]
+        self.assertTrue(aviso['tem_desenho'])
+        self.assertNotIn('tracos', aviso)
+
+    def test_aviso_sem_desenho_quando_desmarcado(self):
+        linha = self._post('quadro_escrever', {'texto': 'A'}).json()['id']
+        self._desenhar()
+        self._post('quadro_avisar', {'ids': [linha], 'desenho': False})
+        d = self._novidades(self.sac_user, alerta=0)['alerta']
+        self.assertEqual(([l['texto'] for l in d['linhas']], d['tracos']), (['A'], []))
+
+    def test_aviso_sem_nada_marcado(self):
+        self._post('quadro_escrever', {'texto': 'A'})
+        self._desenhar()
+        self.assertEqual(self._post('quadro_avisar', {'ids': [], 'desenho': False}).status_code, 400)

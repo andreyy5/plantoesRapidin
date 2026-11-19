@@ -1,11 +1,16 @@
 """
 Quadro do NOC: um quadro "neon" compartilhado onde qualquer usuário escreve
-avisos (rompimentos de rota, SIUs fora...) que aparecem para todos.
+avisos (rompimentos de rota, SIUs fora...) e desenha com o mouse, e tudo
+aparece para todos.
 
 Tempo real por consulta periódica (polling): o servidor roda gunicorn com
 worker síncrono e SQLite, então não usamos WebSocket. Todas as páginas do
 sistema consultam `quadro/novidades/` a cada poucos segundos (ver
 templates/partials/quadro_ao_vivo.html); a resposta é pequena quando nada mudou.
+
+Os traços do desenho nunca mudam depois de criados. O estado do quadro traz só
+os ids dos traços ativos; o navegador busca em `quadro/tracos/` apenas os que
+ainda não conhece, para não reenviar o desenho inteiro a cada traço novo.
 """
 import hashlib
 import json
@@ -19,9 +24,13 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import AlertaQuadro, AnotacaoQuadro, PresencaUsuario
+from .models import AlertaQuadro, AnotacaoQuadro, PresencaUsuario, TracoQuadro
 
 MAX_LINHAS = 40
+MAX_TRACOS = 600
+MAX_PONTOS_POR_TRACO = 2000
+LARGURA = TracoQuadro.UNIDADES_POR_LARGURA
+ALTURA_MAXIMA = LARGURA * 4  # o quadro cresce para baixo, mas com limite
 # Quem consultou o servidor nesse intervalo conta como conectado
 JANELA_CONECTADO = timedelta(seconds=60)
 # A presença só é gravada de tempos em tempos (evita escrita no banco a cada consulta)
@@ -30,8 +39,8 @@ GRAVAR_PRESENCA_A_CADA = timedelta(seconds=20)
 VALIDADE_ALERTA = timedelta(minutes=10)
 # Intervalo mínimo entre dois avisos (evita clique duplo e avisos em sequência)
 INTERVALO_ENTRE_ALERTAS = timedelta(seconds=15)
-# Linhas apagadas ficam guardadas por um tempo (para "Desfazer") e depois são removidas
-GUARDAR_APAGADAS = timedelta(days=30)
+# Linhas e traços apagados ficam guardados por um tempo (para "Desfazer") e depois são removidos
+GUARDAR_APAGADOS = timedelta(days=30)
 
 _CORES = {c for c, _ in AnotacaoQuadro.CORES}
 
@@ -60,6 +69,13 @@ def _dados(request):
     return dados if isinstance(dados, dict) else {}
 
 
+def _ids(valor):
+    """Lista de ids inteiros a partir do que veio no JSON (ignora o resto)."""
+    if not isinstance(valor, list):
+        return []
+    return [i for i in valor if isinstance(i, int) and not isinstance(i, bool)]
+
+
 def _nome(user):
     if user is None:
         return 'Alguém'
@@ -74,18 +90,39 @@ def _ativas():
     return AnotacaoQuadro.objects.filter(apagado_em__isnull=True)
 
 
+def _tracos_ativos():
+    return TracoQuadro.objects.filter(apagado_em__isnull=True)
+
+
 def _limpar_texto(valor):
     """Uma linha só, sem espaços sobrando."""
     return ' '.join(str(valor or '').split())
 
 
+def _pontos_validos(pontos):
+    """Confere o formato [x, y, x, y, ...] e os limites. Devolve a lista ou None."""
+    if not isinstance(pontos, list) or len(pontos) < 2 or len(pontos) % 2:
+        return None
+    if len(pontos) > MAX_PONTOS_POR_TRACO * 2:
+        return None
+    for i, v in enumerate(pontos):
+        if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+            return None
+        if v > (LARGURA if i % 2 == 0 else ALTURA_MAXIMA):
+            return None
+    if len(pontos) == 2:  # um clique sem arrastar vira um ponto
+        pontos = pontos * 2
+    return pontos
+
+
 # ---------- estado do quadro ----------
 
 def _versao():
-    """Muda sempre que uma linha é escrita, editada ou apagada, ou quando sai um aviso."""
+    """Muda sempre que algo é escrito, editado, desenhado ou apagado, ou quando sai um aviso."""
     linhas = list(_ativas().values_list('id', 'atualizado_em'))
+    tracos = list(_tracos_ativos().values_list('id', flat=True))
     ultimo_alerta = AlertaQuadro.objects.values_list('id', flat=True).first() or 0
-    bruto = repr((linhas, ultimo_alerta)).encode()
+    bruto = repr((linhas, tracos, ultimo_alerta)).encode()
     return hashlib.md5(bruto, usedforsecurity=False).hexdigest()[:16]
 
 
@@ -101,14 +138,22 @@ def _anotacao_json(a):
     }
 
 
-def _alerta_json(a):
-    return {
+def _traco_json(t):
+    return {'id': t.id, 'cor': t.cor, 'pontos': t.pontos}
+
+
+def _alerta_json(a, com_desenho=True):
+    dados = {
         'id': a.id,
         'linhas': a.linhas,
+        'tem_desenho': bool(a.tracos),
         'autor': _nome(a.criado_por),
         'autor_id': a.criado_por_id,
         'criado_em': _hora(a.criado_em),
     }
+    if com_desenho:
+        dados['tracos'] = a.tracos
+    return dados
 
 
 def _estado():
@@ -117,7 +162,8 @@ def _estado():
     return {
         'versao': _versao(),
         'anotacoes': [_anotacao_json(a) for a in anotacoes],
-        'avisos': [_alerta_json(a) for a in avisos],
+        'tracos': list(_tracos_ativos().values_list('id', flat=True)),
+        'avisos': [_alerta_json(a, com_desenho=False) for a in avisos],
     }
 
 
@@ -146,6 +192,13 @@ def _resposta_com_estado(request, **extra):
     return JsonResponse({'quadro': _estado(), 'conectados': _conectados(request), **extra})
 
 
+def _faxina(agora):
+    """Remove de vez o que foi apagado há muito tempo (não precisa mais de "Desfazer")."""
+    limite = agora - GUARDAR_APAGADOS
+    AnotacaoQuadro.objects.filter(apagado_em__lt=limite).delete()
+    TracoQuadro.objects.filter(apagado_em__lt=limite).delete()
+
+
 # ---------- páginas e chamadas ----------
 
 @login_required
@@ -153,7 +206,11 @@ def quadro(request):
     """Página do quadro. Acessível a qualquer usuário logado (SAC, técnicos, NOC)."""
     _marcar_presenca(request.user)
     return render(request, 'dashboard/quadro.html', {
-        'estado_inicial': {**_estado(), 'conectados': _conectados(request)},
+        'estado_inicial': {
+            **_estado(),
+            'conectados': _conectados(request),
+            'dados_tracos': [_traco_json(t) for t in _tracos_ativos()],
+        },
         'cores': AnotacaoQuadro.CORES,
         'max_texto': AnotacaoQuadro.MAX_TEXTO,
     })
@@ -175,6 +232,7 @@ def novidades(request):
         'ultimo_alerta': ultimo_id,
         'alerta': None,
         'linhas_no_quadro': _ativas().count(),
+        'tem_desenho': _tracos_ativos().exists(),
     }
 
     visto = request.GET.get('alerta', '')
@@ -194,6 +252,14 @@ def novidades(request):
         if request.GET['versao'] != _versao():
             resposta['quadro'] = _estado()
     return JsonResponse(resposta)
+
+
+@require_GET
+@_login_json
+def tracos(request):
+    """Dados dos traços pedidos (?ids=1,2,3), inclusive apagados (para o "Desfazer" de outra pessoa)."""
+    ids = [int(i) for i in request.GET.get('ids', '').split(',') if i.isdigit()][:MAX_TRACOS]
+    return JsonResponse({'tracos': [_traco_json(t) for t in TracoQuadro.objects.filter(id__in=ids)]})
 
 
 @require_POST
@@ -241,9 +307,35 @@ def apagar(request, anotacao_id):
         apagadas = _ativas().filter(id=anotacao_id).update(
             apagado_em=agora, apagado_por=request.user, atualizado_em=agora
         )
-        # Faxina: linhas apagadas há muito tempo não precisam mais de "Desfazer"
-        AnotacaoQuadro.objects.filter(apagado_em__lt=agora - GUARDAR_APAGADAS).delete()
+        _faxina(agora)
     return _resposta_com_estado(request, apagadas=[anotacao_id] if apagadas else [])
+
+
+@require_POST
+@_login_json
+def desenhar(request):
+    """Grava um traço feito à mão."""
+    dados = _dados(request)
+    pontos = _pontos_validos(dados.get('pontos'))
+    if pontos is None:
+        return _erro('Não foi possível salvar o desenho. Tente de novo.')
+    if _tracos_ativos().count() >= MAX_TRACOS:
+        return _erro('O quadro está cheio de desenhos. Use o apagador ou limpe o quadro.')
+    cor = dados.get('cor') if dados.get('cor') in _CORES else 'rosa'
+    traco = TracoQuadro.objects.create(cor=cor, pontos=pontos, criado_por=request.user)
+    return _resposta_com_estado(request, id=traco.id)
+
+
+@require_POST
+@_login_json
+def apagar_tracos(request):
+    agora = timezone.now()
+    ids = _ids(_dados(request).get('ids'))
+    with transaction.atomic():
+        apagados = list(_tracos_ativos().filter(id__in=ids).values_list('id', flat=True))
+        TracoQuadro.objects.filter(id__in=apagados).update(apagado_em=agora, apagado_por=request.user)
+        _faxina(agora)
+    return _resposta_com_estado(request, tracos_apagados=apagados)
 
 
 @require_POST
@@ -255,28 +347,39 @@ def limpar(request):
         AnotacaoQuadro.objects.filter(id__in=ids).update(
             apagado_em=agora, apagado_por=request.user, atualizado_em=agora
         )
-    return _resposta_com_estado(request, apagadas=ids)
+        tracos_ids = list(_tracos_ativos().values_list('id', flat=True))
+        TracoQuadro.objects.filter(id__in=tracos_ids).update(apagado_em=agora, apagado_por=request.user)
+    return _resposta_com_estado(request, apagadas=ids, tracos_apagados=tracos_ids)
 
 
 @require_POST
 @_login_json
 def restaurar(request):
-    """Desfaz "Apagar" e "Limpar quadro"."""
-    ids = [i for i in _dados(request).get('ids', []) if isinstance(i, int)]
-    vagas = MAX_LINHAS - _ativas().count()
-    if len(ids) > vagas:
+    """Desfaz "Apagar", o apagador de desenhos e "Limpar quadro"."""
+    dados = _dados(request)
+    ids, tracos_ids = _ids(dados.get('ids')), _ids(dados.get('tracos'))
+    if len(ids) > MAX_LINHAS - _ativas().count() or len(tracos_ids) > MAX_TRACOS - _tracos_ativos().count():
         return _erro('Não cabe tudo de volta: o quadro já está cheio.')
-    AnotacaoQuadro.objects.filter(id__in=ids, apagado_em__isnull=False).update(
-        apagado_em=None, apagado_por=None, atualizado_em=timezone.now()
-    )
+    agora = timezone.now()
+    with transaction.atomic():
+        AnotacaoQuadro.objects.filter(id__in=ids, apagado_em__isnull=False).update(
+            apagado_em=None, apagado_por=None, atualizado_em=agora
+        )
+        TracoQuadro.objects.filter(id__in=tracos_ids, apagado_em__isnull=False).update(
+            apagado_em=None, apagado_por=None
+        )
     return _resposta_com_estado(request)
 
 
 @require_POST
 @_login_json
 def avisar(request):
-    """Dispara o aviso com as linhas escolhidas (todas, se nenhuma for informada)."""
+    """
+    Dispara o aviso. `ids`: linhas escolhidas (todas, se não vier); `desenho`: se
+    inclui os desenhos (sim, se não vier). O texto é lido em voz alta; o desenho só aparece.
+    """
     agora = timezone.now()
+    dados = _dados(request)
     with transaction.atomic():
         ultimo = AlertaQuadro.objects.select_related('criado_por').first()
         if ultimo and agora - ultimo.criado_em < INTERVALO_ENTRE_ALERTAS:
@@ -284,13 +387,15 @@ def avisar(request):
             return _erro(f'{quem} acabou de enviar um aviso. Aguarde alguns segundos.', status=429)
 
         anotacoes = _ativas()
-        ids = _dados(request).get('ids')
-        if isinstance(ids, list) and ids:
-            anotacoes = anotacoes.filter(id__in=[i for i in ids if isinstance(i, int)])
+        if 'ids' in dados:
+            anotacoes = anotacoes.filter(id__in=_ids(dados['ids']))
         linhas = [{'texto': a.texto, 'cor': a.cor} for a in anotacoes]
-        if not linhas:
-            return _erro('Não há nada escrito no quadro para avisar.')
-        alerta = AlertaQuadro.objects.create(linhas=linhas, criado_por=request.user)
+        desenho = []
+        if dados.get('desenho', True):
+            desenho = [{'cor': t.cor, 'pontos': t.pontos} for t in _tracos_ativos()]
+        if not linhas and not desenho:
+            return _erro('Não há nada no quadro para avisar.')
+        alerta = AlertaQuadro.objects.create(linhas=linhas, tracos=desenho, criado_por=request.user)
 
     outros = [c for c in _conectados(request) if not c['voce']]
     return _resposta_com_estado(request, alerta=_alerta_json(alerta), avisados=len(outros))

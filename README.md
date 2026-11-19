@@ -28,9 +28,15 @@ Página `/plantao/quadro/` (menu **Quadro do NOC**), aberta a qualquer usuário 
 quadro branco do SAC: cada linha é um aviso (ex.: `Vila Militar 1/1/1 fora`), com cor de caneta neon.
 Escrever, editar e apagar aparece para todos em até ~2 s. Apagar e limpar o quadro podem ser desfeitos.
 
+Ferramentas: **Texto** (digitar), **Caneta** (escrever/desenhar com mouse, caneta ou dedo) e
+**Apagador** (apaga traços do desenho). `Ctrl+Z` desfaz o seu último traço. **Expandir** abre o quadro
+em tela cheia (bom para uma TV na parede). Texto e desenho são medidos em % da largura do quadro, então
+ficam no mesmo lugar em qualquer tamanho de tela.
+
 **Avisar** abre um aviso em tela, com som e leitura em voz alta das linhas escolhidas, para todos
-os usuários com o sistema aberto (em qualquer página). Quem abrir o sistema nos 10 minutos seguintes
-também recebe. Na leitura, `1/1/1` vira "1 barra 1 barra 1", para não ser lido como data.
+os usuários com o sistema aberto (em qualquer página). O desenho, se incluído, aparece no aviso mas
+não é lido. Quem abrir o sistema nos 10 minutos seguintes também recebe. Na leitura, `1/1/1` vira
+"1 barra 1 barra 1", para não ser lido como data.
 
 - Tempo real por consulta periódica (`/plantao/quadro/novidades/`, a cada 5 s em qualquer página e a
   cada 2 s na página do quadro). Não precisa de WebSocket, Redis nem mudança no `entrypoint.sh`.

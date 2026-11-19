@@ -538,6 +538,8 @@ class AlertaQuadro(models.Model):
 
     # [{"texto": "...", "cor": "rosa"}, ...] — o que estava no quadro na hora do aviso
     linhas = models.JSONField(default=list)
+    # [{"cor": "rosa", "pontos": [x, y, x, y, ...]}, ...] — desenhos do quadro na hora do aviso
+    tracos = models.JSONField(default=list, blank=True)
     criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     criado_em = models.DateTimeField(auto_now_add=True)
 
@@ -552,6 +554,34 @@ class AlertaQuadro(models.Model):
     @property
     def texto(self):
         return '\n'.join(l.get('texto', '') for l in self.linhas)
+
+
+class TracoQuadro(models.Model):
+    """
+    Um traço feito à mão (mouse, caneta ou dedo) no quadro do NOC.
+
+    `pontos` é a lista [x0, y0, x1, y1, ...] em inteiros, medidos em décimos de
+    milésimo da LARGURA do quadro (0 a 10000 na horizontal). Assim o desenho fica
+    no mesmo lugar em qualquer tamanho de tela. Um traço nunca muda depois de
+    criado; apagar só marca `apagado_em` (para o "Desfazer").
+    """
+
+    UNIDADES_POR_LARGURA = 10000
+
+    cor = models.CharField(max_length=10, choices=AnotacaoQuadro.CORES, default='rosa')
+    pontos = models.JSONField()
+    criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    apagado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    apagado_em = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Traço do quadro"
+        verbose_name_plural = "Traços do quadro"
+        ordering = ['id']
+
+    def __str__(self):
+        return f"Traço {self.cor} ({len(self.pontos) // 2} pontos)"
 
 
 class PresencaUsuario(models.Model):
