@@ -1,0 +1,322 @@
+{% load static %}{# Quadro do NOC: consulta periódica, contador no menu e aviso em tela + voz. Incluído no base.html para usuários logados. #}
+<style>
+  .font-quadro { font-family: 'Caveat', 'Segoe Print', 'Comic Sans MS', cursive; font-weight: 700; }
+  .neon {
+    --neon: #ff4fd8;
+    color: var(--neon);
+    color: color-mix(in oklab, var(--neon) 70%, white);
+    text-shadow: 0 0 6px var(--neon), 0 0 16px var(--neon);
+    text-shadow: 0 0 2px color-mix(in oklab, var(--neon) 60%, white), 0 0 8px var(--neon), 0 0 20px var(--neon),
+                 0 0 34px color-mix(in oklab, var(--neon) 55%, transparent);
+  }
+  .neon.neon-fraco { text-shadow: 0 0 1px var(--neon), 0 0 6px var(--neon), 0 0 12px color-mix(in oklab, var(--neon) 60%, transparent); }
+  .neon::placeholder { color: rgba(255,255,255,.28); text-shadow: none; }
+  .neon-rosa { --neon: #ff4fd8; } .neon-ciano { --neon: #2ee6ff; } .neon-verde { --neon: #4dff8f; }
+  .neon-amarelo { --neon: #fff35c; } .neon-laranja { --neon: #ff8a4c; } .neon-roxo { --neon: #bd8cff; }
+
+  @property --giro { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+  @keyframes giro-neon { to { --giro: 360deg; } }
+  .moldura-neon {
+    position: relative; isolation: isolate;
+    background: conic-gradient(from var(--giro), #ff4fd8, #2ee6ff, #4dff8f, #fff35c, #ff8a4c, #bd8cff, #ff4fd8);
+    animation: giro-neon 10s linear infinite;
+  }
+  .moldura-neon::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: -1;
+    background: inherit; animation: inherit; filter: blur(18px); opacity: .5;
+  }
+  @keyframes pulso-aviso { 0% { box-shadow: 0 0 0 0 rgba(233,73,32,.65); } 100% { box-shadow: 0 0 0 14px rgba(233,73,32,0); } }
+  .pulso-aviso { animation: pulso-aviso 1.2s ease-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .moldura-neon, .moldura-neon::before, .pulso-aviso { animation: none; } }
+</style>
+
+<dialog id="alerta-quadro" aria-labelledby="alerta-quadro-titulo" aria-describedby="alerta-quadro-linhas"
+        class="p-4 sm:p-6 bg-transparent w-full max-w-[39rem] backdrop:bg-black/75 backdrop:backdrop-blur-sm">
+  <div class="moldura-neon rounded-[28px] p-[3px]">
+    <div class="rounded-[25px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
+      <div class="flex items-start gap-3">
+        <span class="pulso-aviso w-11 h-11 rounded-2xl bg-[#E94920] text-white flex items-center justify-center shrink-0">
+          {% include 'partials/icon.html' with nome='megaphone' classe='w-6 h-6' %}
+        </span>
+        <div class="min-w-0">
+          <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-fuchsia-300/80">Aviso do NOC</p>
+          <h2 id="alerta-quadro-titulo" class="text-lg font-bold text-white leading-tight">Atenção ao quadro</h2>
+          <p class="text-xs text-gray-400 mt-0.5" data-alerta-meta></p>
+        </div>
+      </div>
+      <ul id="alerta-quadro-linhas" class="mt-5 flex flex-col gap-1"></ul>
+      <p data-alerta-dica-voz class="hidden mt-4 px-3 py-2 rounded-xl bg-amber-400/10 text-amber-200 text-xs font-medium">
+        O navegador bloqueou a leitura automática. Clique em <strong>Ouvir aviso</strong> para escutar.
+      </p>
+      <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
+        <button type="button" data-alerta-ouvir class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+          {% include 'partials/icon.html' with nome='volume' classe='w-4 h-4' %}
+          <span data-alerta-ouvir-texto>Ouvir de novo</span>
+        </button>
+        <a href="{% url 'quadro' %}" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+          {% include 'partials/icon.html' with nome='board' classe='w-4 h-4' %}
+          Abrir quadro
+        </a>
+        <button type="button" data-alerta-ciente class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-lg shadow-[#E94920]/30">
+          Ciente
+        </button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  var URL_NOVIDADES = '{% url "quadro_novidades" %}';
+  var ICONE = '{% static "assets/favicon.png" %}';
+  // Por aba (sobrevive à troca de página): último aviso que esta aba já viu
+  var CHAVE_VISTO = 'quadro.alertaVisto';
+  // Compartilhadas entre abas: evita ler o mesmo aviso duas vezes e fecha o aviso em todas ao clicar em "Ciente"
+  var CHAVE_FALADO = 'quadro.alertaFalado', CHAVE_CIENTE = 'quadro.alertaCiente', CHAVE_VOZ = 'quadro.lerEmVozAlta';
+
+  function ler(area, chave) { try { return window[area].getItem(chave); } catch (e) { return null; } }
+  function gravar(area, chave, valor) { try { window[area].setItem(chave, String(valor)); } catch (e) {} }
+  function numero(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+
+  var visto = ler('sessionStorage', CHAVE_VISTO);
+  visto = visto === null ? null : numero(visto);
+
+  var api = window.QuadroAoVivo = {
+    versao: null,      // definido pela página do quadro
+    ouvinte: null,     // function (resposta, inicioDaConsulta)
+    aoMudarStatus: null,
+    assinar: function (versao, ouvinte) { api.versao = versao; api.ouvinte = ouvinte; consultar(); },
+    consultarAgora: function () { consultar(); },
+    vozAtiva: function () { return ler('localStorage', CHAVE_VOZ) !== '0'; },
+    definirVoz: function (ativa) { gravar('localStorage', CHAVE_VOZ, ativa ? '1' : '0'); },
+    testar: function () {
+      tocarSinal();
+      setTimeout(function () { falar(['Teste do quadro do NOC.', 'Vila Militar 1/1/1 fora.']); }, 700);
+    },
+    formatarHora: formatarHora,
+  };
+
+  // ---------- consulta periódica ----------
+  var emAndamento = false, ultimaConsulta = 0, falhas = 0, parado = false, status = null;
+
+  function intervalo() {
+    var base = api.ouvinte && !document.hidden ? 2000 : 5000;
+    return falhas ? Math.min(base * Math.pow(2, falhas), 30000) : base;
+  }
+
+  function mudarStatus(novo) {
+    if (novo === status) return;
+    status = novo;
+    if (api.aoMudarStatus) api.aoMudarStatus(novo);
+  }
+
+  function consultar() {
+    if (emAndamento || parado) return;
+    emAndamento = true;
+    var inicio = ultimaConsulta = Date.now();
+    var params = new URLSearchParams();
+    if (visto !== null) params.set('alerta', visto);
+    if (api.ouvinte) params.set('versao', api.versao || '');
+    fetch(URL_NOVIDADES + '?' + params.toString(), {
+      credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'application/json' }
+    })
+      .then(function (r) {
+        if (r.status === 401 || r.status === 403) { parado = true; mudarStatus('sessao'); return null; }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (d) {
+        if (!d) return;
+        falhas = 0;
+        mudarStatus('ok');
+        tratar(d, inicio);
+      })
+      .catch(function () { falhas = Math.min(falhas + 1, 4); mudarStatus('offline'); })
+      .then(function () { emAndamento = false; });
+  }
+
+  function tratar(d, inicio) {
+    var n = d.linhas_no_quadro || 0;
+    document.querySelectorAll('[data-contador="quadro"]').forEach(function (el) {
+      el.textContent = n;
+      el.classList.toggle('hidden', !n);
+      el.classList.toggle('flex', !!n);
+      el.setAttribute('aria-label', n + (n === 1 ? ' linha' : ' linhas') + ' no quadro');
+    });
+
+    if (d.alerta && visto !== null) mostrarAlerta(d.alerta);
+    if (visto === null || d.ultimo_alerta > visto) {
+      visto = d.ultimo_alerta;
+      gravar('sessionStorage', CHAVE_VISTO, visto);
+    }
+    if (api.ouvinte) api.ouvinte(d, inicio);
+  }
+
+  // O navegador reduz os timers de abas em segundo plano (até 1 vez por minuto).
+  // Um worker marca o tempo sem essa limitação, para o aviso chegar rápido mesmo com a aba escondida.
+  function tique() { if (Date.now() - ultimaConsulta >= intervalo()) consultar(); }
+  var relogioReserva = null;
+  function usarRelogioReserva() { if (!relogioReserva) relogioReserva = setInterval(tique, 1000); }
+  try {
+    var codigo = new Blob(['setInterval(function(){postMessage(0)},1000)'], { type: 'text/javascript' });
+    var relogio = new Worker(URL.createObjectURL(codigo));
+    relogio.onmessage = tique;
+    relogio.onerror = usarRelogioReserva;
+  } catch (e) { usarRelogioReserva(); }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) consultar(); });
+  window.addEventListener('online', function () { falhas = 0; consultar(); });
+  consultar();
+
+  // ---------- aviso ----------
+  var dialogo = document.getElementById('alerta-quadro');
+  var listaAlerta = document.getElementById('alerta-quadro-linhas');
+  var meta = dialogo.querySelector('[data-alerta-meta]');
+  var dicaVoz = dialogo.querySelector('[data-alerta-dica-voz]');
+  var botaoOuvir = dialogo.querySelector('[data-alerta-ouvir]');
+  var textoOuvir = dialogo.querySelector('[data-alerta-ouvir-texto]');
+  var alertaAtual = null, tituloOriginal = document.title, piscando = null;
+
+  function formatarHora(iso) {
+    if (!iso) return '';
+    var d = new Date(iso), agora = new Date();
+    var hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === agora.toDateString()) return hm;
+    var ontem = new Date(agora); ontem.setDate(agora.getDate() - 1);
+    if (d.toDateString() === ontem.toDateString()) return 'ontem ' + hm;
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + hm;
+  }
+
+  function mostrarAlerta(a) {
+    if (numero(ler('localStorage', CHAVE_CIENTE)) >= a.id) return;  // já confirmado em outra aba
+    alertaAtual = a;
+    meta.textContent = 'Enviado por ' + a.autor + ' às ' + formatarHora(a.criado_em);
+    listaAlerta.replaceChildren();
+    a.linhas.forEach(function (l) {
+      var li = document.createElement('li');
+      li.className = 'neon neon-' + l.cor + ' font-quadro text-[26px] sm:text-[32px] leading-tight break-words';
+      li.textContent = l.texto;
+      listaAlerta.appendChild(li);
+    });
+    dicaVoz.classList.add('hidden');
+    textoOuvir.textContent = 'Ouvir de novo';
+    if (!dialogo.open) {
+      if (dialogo.showModal) dialogo.showModal(); else dialogo.setAttribute('open', '');
+    }
+    dialogo.querySelector('[data-alerta-ciente]').focus();
+
+    tocarSinal();
+    // Só uma aba lê em voz alta
+    if (api.vozAtiva() && numero(ler('localStorage', CHAVE_FALADO)) < a.id) {
+      gravar('localStorage', CHAVE_FALADO, a.id);
+      setTimeout(function () { falar(frasesDoAlerta(a), vozBloqueada); }, 700);
+    }
+    notificarSistema(a);
+    piscarTitulo();
+  }
+
+  function fecharAlerta(avisarOutrasAbas) {
+    if (!alertaAtual) return;
+    if (avisarOutrasAbas) gravar('localStorage', CHAVE_CIENTE, alertaAtual.id);
+    alertaAtual = null;
+    pararDeFalar();
+    pararPiscar();
+    if (dialogo.open) { if (dialogo.close) dialogo.close(); else dialogo.removeAttribute('open'); }
+  }
+
+  dialogo.querySelector('[data-alerta-ciente]').addEventListener('click', function () { fecharAlerta(true); });
+  dialogo.addEventListener('cancel', function (e) { e.preventDefault(); fecharAlerta(true); });  // Esc
+  botaoOuvir.addEventListener('click', function () {
+    if (!alertaAtual) return;
+    dicaVoz.classList.add('hidden');
+    textoOuvir.textContent = 'Ouvir de novo';
+    falar(frasesDoAlerta(alertaAtual), vozBloqueada);
+  });
+  window.addEventListener('storage', function (e) {
+    if (e.key === CHAVE_CIENTE && alertaAtual && numero(e.newValue) >= alertaAtual.id) fecharAlerta(false);
+  });
+
+  function vozBloqueada() {
+    dicaVoz.classList.remove('hidden');
+    textoOuvir.textContent = 'Ouvir aviso';
+    botaoOuvir.focus();
+  }
+
+  function piscarTitulo() {
+    pararPiscar();
+    var ligado = false;
+    piscando = setInterval(function () {
+      ligado = !ligado;
+      document.title = ligado ? '(!) Aviso do NOC' : tituloOriginal;
+    }, 1000);
+  }
+  function pararPiscar() { if (piscando) clearInterval(piscando); piscando = null; document.title = tituloOriginal; }
+
+  function notificarSistema(a) {
+    if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
+    try {
+      var n = new Notification('Aviso do NOC', {
+        body: a.linhas.map(function (l) { return l.texto; }).join('\n'),
+        tag: 'quadro-noc-' + a.id, icon: ICONE, requireInteraction: true,
+      });
+      n.onclick = function () { window.focus(); n.close(); };
+    } catch (e) {}
+  }
+
+  // ---------- som e voz ----------
+  var audio = null;
+  function tocarSinal() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+      var t = audio.currentTime;
+      [[880, 0], [1320, 0.18]].forEach(function (nota) {
+        var osc = audio.createOscillator(), ganho = audio.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = nota[0];
+        ganho.gain.setValueAtTime(0.0001, t + nota[1]);
+        ganho.gain.exponentialRampToValueAtTime(0.25, t + nota[1] + 0.02);
+        ganho.gain.exponentialRampToValueAtTime(0.0001, t + nota[1] + 0.35);
+        osc.connect(ganho); ganho.connect(audio.destination);
+        osc.start(t + nota[1]); osc.stop(t + nota[1] + 0.4);
+      });
+    } catch (e) {}
+  }
+
+  function frasesDoAlerta(a) {
+    return ['Atenção, aviso no quadro do NOC.'].concat(a.linhas.map(function (l) { return l.texto; }));
+  }
+
+  // "1/1/1" seria lido como data ("1 de janeiro..."); no NOC é slot/porta, lido como "1 barra 1 barra 1"
+  function paraFala(texto) {
+    return texto
+      .replace(/(\d)\s*\/\s*(?=\d)/g, '$1 barra ')
+      .replace(/\s+[-–—]\s+/g, ', ');
+  }
+
+  function vozPortugues() {
+    var vozes = window.speechSynthesis.getVoices();
+    var br = vozes.filter(function (v) { return /^pt[-_]BR/i.test(v.lang); });
+    return br.filter(function (v) { return /natural|online/i.test(v.name); })[0] || br[0]
+      || vozes.filter(function (v) { return /^pt/i.test(v.lang); })[0] || null;
+  }
+  if ('speechSynthesis' in window) window.speechSynthesis.getVoices();  // começa a carregar as vozes
+
+  // Cada linha vira uma fala separada (falas longas são cortadas em alguns navegadores)
+  function falar(frases, aoBloquear) {
+    if (!('speechSynthesis' in window)) return;
+    var sintese = window.speechSynthesis, voz = vozPortugues();
+    sintese.cancel();
+    frases.forEach(function (frase) {
+      var fala = new SpeechSynthesisUtterance(paraFala(frase));
+      fala.lang = 'pt-BR';
+      if (voz) fala.voice = voz;
+      fala.rate = 0.95;
+      fala.onerror = function (e) {
+        if (e.error === 'not-allowed' && aoBloquear) { aoBloquear(); aoBloquear = null; }
+      };
+      sintese.speak(fala);
+    });
+  }
+  function pararDeFalar() { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); }
+})();
+</script>

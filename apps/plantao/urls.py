@@ -1,12 +1,22 @@
 # Adicione estas URLs ao seu apps/plantao/urls.py
 
 from django.urls import path
-from . import views
+from . import views, quadro
 
 urlpatterns = [
     # Dashboard
     path('', views.dashboard, name='dashboard'),
     
+    # Quadro do NOC
+    path('quadro/', quadro.quadro, name='quadro'),
+    path('quadro/novidades/', quadro.novidades, name='quadro_novidades'),
+    path('quadro/escrever/', quadro.escrever, name='quadro_escrever'),
+    path('quadro/<int:anotacao_id>/editar/', quadro.editar, name='quadro_editar'),
+    path('quadro/<int:anotacao_id>/apagar/', quadro.apagar, name='quadro_apagar'),
+    path('quadro/limpar/', quadro.limpar, name='quadro_limpar'),
+    path('quadro/restaurar/', quadro.restaurar, name='quadro_restaurar'),
+    path('quadro/avisar/', quadro.avisar, name='quadro_avisar'),
+
     # Relatórios
     path('relatorios/', views.relatorios, name='relatorios'),
     path('relatorios/pdf/', views.relatorio_pdf, name='relatorio_pdf'),

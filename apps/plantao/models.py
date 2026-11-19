@@ -493,3 +493,76 @@ class EscalaAutomaticaTecnico(models.Model):
 # Adicione este import no topo do arquivo se não tiver
 from django.utils import timezone
 from datetime import datetime
+
+
+# ========== QUADRO DO NOC ==========
+
+class AnotacaoQuadro(models.Model):
+    """
+    Uma linha escrita no quadro do NOC (ex.: "Vila Militar 1/1/1 fora").
+    Apagar só marca a linha (apagado_em), para o "Desfazer" funcionar.
+    """
+
+    CORES = [
+        ('rosa', 'Rosa'),
+        ('ciano', 'Ciano'),
+        ('verde', 'Verde'),
+        ('amarelo', 'Amarelo'),
+        ('laranja', 'Laranja'),
+        ('roxo', 'Roxo'),
+    ]
+    MAX_TEXTO = 200
+
+    texto = models.CharField(max_length=MAX_TEXTO)
+    cor = models.CharField(max_length=10, choices=CORES, default='rosa')
+    criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    editado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    apagado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    editado_em = models.DateTimeField(null=True, blank=True)
+    apagado_em = models.DateTimeField(null=True, blank=True, db_index=True)
+    # Muda a cada alteração (inclusive apagar/desfazer); usado para saber se o quadro mudou
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Anotação do quadro"
+        verbose_name_plural = "Anotações do quadro"
+        ordering = ['criado_em', 'id']
+
+    def __str__(self):
+        return self.texto
+
+
+class AlertaQuadro(models.Model):
+    """Aviso disparado pelo botão "Avisar": aparece (e é lido em voz alta) para quem está conectado."""
+
+    # [{"texto": "...", "cor": "rosa"}, ...] — o que estava no quadro na hora do aviso
+    linhas = models.JSONField(default=list)
+    criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Aviso do quadro"
+        verbose_name_plural = "Avisos do quadro"
+        ordering = ['-id']
+
+    def __str__(self):
+        return self.texto
+
+    @property
+    def texto(self):
+        return '\n'.join(l.get('texto', '') for l in self.linhas)
+
+
+class PresencaUsuario(models.Model):
+    """Última vez que o navegador do usuário falou com o servidor (para saber quem está conectado)."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, related_name='presenca')
+    visto_em = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Presença"
+        verbose_name_plural = "Presenças"
+
+    def __str__(self):
+        return f"{self.user} ({self.visto_em:%d/%m %H:%M})"

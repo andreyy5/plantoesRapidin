@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="{% static 'assets/favicon.png' %}">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Caveat:wght@700&display=swap" rel="stylesheet">
   <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Poppins','sans-serif']}}}}</script>
   <style>
     :focus-visible { outline: 2px solid #E94920; outline-offset: 2px; }
@@ -125,6 +125,7 @@
   document.addEventListener('submit', function (e) {
     if (e.defaultPrevented) return;            // ex.: confirm() cancelado
     var form = e.target;
+    if (form.getAttribute('method') === 'dialog') return;  // só fecha um <dialog>, não envia nada
     if (form.hasAttribute('data-enviando')) { e.preventDefault(); return; }
     form.setAttribute('data-enviando', '');
     var botao = e.submitter;
@@ -146,6 +147,7 @@
   });
 })();
 </script>
+{% if user.is_authenticated %}{% include 'partials/quadro_ao_vivo.html' %}{% endif %}
 {% block extra_js %}{% endblock %}
 </body>
 </html>

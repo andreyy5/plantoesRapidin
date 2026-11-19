@@ -1,0 +1,666 @@
+{% extends 'base.html' %}
+{% block title %}Quadro do NOC - Rapidin Plantões{% endblock %}
+
+{% block extra_css %}
+<style>
+  .quadro-superficie {
+    background:
+      radial-gradient(120% 70% at 8% 0%, rgba(255,255,255,.075), transparent 55%),
+      radial-gradient(70% 60% at 100% 100%, rgba(46,230,255,.05), transparent 60%),
+      repeating-linear-gradient(115deg, rgba(255,255,255,.012) 0 2px, transparent 2px 7px),
+      #07070c;
+  }
+  /* Bandeja de canetas */
+  .caneta-corpo {
+    --neon: #ff4fd8;
+    position: relative; display: block; width: 58px; height: 16px; border-radius: 3px 8px 8px 3px;
+    background: linear-gradient(90deg, var(--neon) 0 30%, #23232c 30% 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 -2px 0 rgba(0,0,0,.35);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .caneta-corpo::before {
+    content: ''; position: absolute; left: -7px; top: 4px; width: 8px; height: 8px;
+    border-radius: 4px 0 0 4px; background: var(--neon);
+  }
+  input:checked + .caneta-corpo { transform: translateY(-5px); box-shadow: 0 0 14px var(--neon), 0 0 3px var(--neon), inset 0 1px 0 rgba(255,255,255,.25); }
+  input:focus-visible + .caneta-corpo { outline: 2px solid #fff; outline-offset: 4px; }
+  /* Linha nova: aparece como se estivesse sendo escrita (margens negativas para não cortar o brilho) */
+  @keyframes escrevendo { from { clip-path: inset(-1em 100% -1em -1em); } to { clip-path: inset(-1em -1em -1em -1em); } }
+  @keyframes acendendo { 0%, 100% { filter: none; } 30% { filter: brightness(1.8); } }
+  .linha-nova .neon { animation: escrevendo .7s cubic-bezier(.3,.7,.4,1) backwards, acendendo 1.2s ease-out .5s; }
+  @media (max-width: 639px) { .caneta-corpo { width: 44px; } }
+  @keyframes tremer { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  .tremer { animation: tremer .25s ease 2; }
+  @media (prefers-reduced-motion: reduce) { .linha-nova .neon, .tremer { animation: none; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+
+<!-- Cabeçalho -->
+<div class="flex items-start justify-between flex-wrap gap-3">
+  <div>
+    <h1 class="text-xl font-bold text-[#50443C]">Quadro do NOC</h1>
+    <p class="text-xs text-gray-400 font-medium mt-1">O que for escrito aqui aparece na hora para todos. Use <strong class="text-gray-500">Avisar</strong> para chamar quem está conectado.</p>
+  </div>
+  <div class="flex items-center gap-2 flex-wrap">
+    <span id="status" class="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-gray-200/80 text-xs font-bold text-emerald-700" role="status">
+      <span class="relative flex w-2.5 h-2.5" aria-hidden="true">
+        <span data-status-ping class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span data-status-ponto class="relative inline-flex rounded-full w-2.5 h-2.5 bg-emerald-500"></span>
+      </span>
+      <span data-status-texto>Ao vivo</span>
+    </span>
+    <button type="button" id="botao-avisar"
+            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-[#E94920]">
+      {% include 'partials/icon.html' with nome='megaphone' classe='w-4 h-4' %}
+      Avisar
+    </button>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
+
+  <!-- Quadro -->
+  <section aria-labelledby="titulo-quadro" class="min-w-0">
+    <h2 id="titulo-quadro" class="sr-only">Quadro</h2>
+    <div class="moldura-neon rounded-[30px] p-[3px] shadow-xl shadow-black/20">
+      <div class="quadro-superficie rounded-[27px] min-h-[440px] sm:min-h-[520px] flex flex-col px-3 sm:px-6 pt-5 sm:pt-6 pb-4">
+
+        <ul id="linhas" class="flex flex-col gap-0.5 sm:gap-1" aria-label="Linhas do quadro"></ul>
+
+        <div id="vazio" class="hidden flex-1 flex flex-col items-center justify-center text-center px-4 py-10">
+          <p class="neon neon-ciano font-quadro text-4xl sm:text-5xl opacity-60">Quadro limpo</p>
+          <p class="mt-3 text-sm text-white/40">Nada fora do normal por enquanto. Escreva abaixo quando algo cair,<br class="hidden sm:inline"> por exemplo <span class="text-white/60">Vila Militar 1/1/1 fora</span>.</p>
+        </div>
+
+        <form id="form-escrever" class="mt-auto pt-4 border-t border-white/10 flex items-center gap-2 sm:gap-3" autocomplete="off" novalidate>
+          <label for="nova-linha" class="sr-only">Escrever no quadro</label>
+          <input id="nova-linha" type="text" maxlength="{{ max_texto }}" enterkeyhint="send"
+                 placeholder="Escreva aqui... ex.: Centro 1/12 fora parcialmente"
+                 class="neon neon-rosa font-quadro flex-1 min-w-0 bg-transparent text-[24px] sm:text-[30px] leading-tight py-1 outline-none focus:outline-none focus-visible:outline-none">
+          <button type="submit" class="shrink-0 inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl text-sm font-bold bg-white/10 text-white hover:bg-white/20 transition-colors">
+            {% include 'partials/icon.html' with nome='edit' classe='w-4 h-4' %}
+            <span class="hidden sm:inline">Escrever</span><span class="sr-only sm:hidden">Escrever</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Bandeja: cor da caneta e apagador -->
+    <div class="mx-4 sm:mx-8 -mt-px flex items-center gap-3 sm:gap-5 px-4 sm:px-5 pt-4 pb-3 rounded-b-2xl bg-gradient-to-b from-[#3a3a44] to-[#25252d] shadow-md">
+      <fieldset class="flex items-center gap-x-3 gap-y-2 sm:gap-6 flex-wrap min-w-0">
+        <legend class="sr-only">Cor da caneta</legend>
+        {% for valor, rotulo in cores %}
+        <label class="cursor-pointer py-1 pl-2" title="Caneta {{ rotulo|lower }}">
+          <input type="radio" name="cor" value="{{ valor }}" class="sr-only" {% if forloop.first %}checked{% endif %}>
+          <span class="caneta-corpo neon-{{ valor }}" aria-hidden="true"></span>
+          <span class="sr-only">{{ rotulo }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      <button type="button" id="botao-limpar" class="ml-auto shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-colors">
+        {% include 'partials/icon.html' with nome='trash' classe='w-4 h-4' %}
+        <span class="hidden sm:inline">Limpar quadro</span><span class="sr-only sm:hidden">Limpar quadro</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Lateral -->
+  <aside class="flex flex-col gap-4" aria-label="Informações do quadro">
+
+    <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+      <h2 class="flex items-center justify-between px-4 pt-4 pb-2 text-sm font-bold">
+        Conectados agora
+        <span id="total-conectados" class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs"></span>
+      </h2>
+      <ul id="conectados" class="px-4 pb-4 flex flex-col gap-1.5 text-sm"></ul>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm">
+      <h2 class="px-4 pt-4 pb-2 text-sm font-bold">Últimos avisos</h2>
+      <ul id="avisos" class="px-4 pb-4 flex flex-col gap-3"></ul>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-gray-200/80 shadow-sm px-4 py-4 flex flex-col gap-3">
+      <h2 class="text-sm font-bold">Avisos neste computador</h2>
+      <label class="flex items-center gap-2.5 text-sm cursor-pointer">
+        <input type="checkbox" id="ler-em-voz-alta" class="w-4 h-4 accent-[#E94920]">
+        Ler os avisos em voz alta
+      </label>
+      <button type="button" id="testar-voz" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+        {% include 'partials/icon.html' with nome='volume' classe='w-4 h-4' %}
+        Testar som e voz
+      </button>
+      <div id="notificacoes-sistema" class="hidden flex-col gap-2">
+        <button type="button" id="ativar-notificacoes" class="hidden items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-left text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+          {% include 'partials/icon.html' with nome='bell' classe='w-4 h-4 shrink-0' %}
+          Mostrar aviso mesmo com o navegador minimizado
+        </button>
+        <p id="estado-notificacoes" class="text-xs text-gray-500 leading-relaxed"></p>
+      </div>
+      <p class="text-[11px] text-gray-400 leading-relaxed">Para receber os avisos, deixe o sistema aberto em alguma aba. O navegador só libera o som depois que você clica em algo na página.</p>
+    </section>
+  </aside>
+</div>
+
+<!-- Confirmar aviso -->
+<dialog id="dialogo-avisar" aria-labelledby="dialogo-avisar-titulo"
+        class="p-0 rounded-2xl w-[calc(100%-2rem)] max-w-lg shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm">
+  <form method="dialog" id="form-avisar" class="flex flex-col">
+    <div class="px-5 pt-5 pb-3">
+      <h2 id="dialogo-avisar-titulo" class="text-base font-bold text-[#50443C]">Avisar quem está conectado</h2>
+      <p id="avisar-destino" class="text-sm text-gray-500 mt-1"></p>
+    </div>
+    <fieldset class="px-5">
+      <legend class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">O que será lido</legend>
+      <div id="avisar-linhas" class="flex flex-col gap-1 max-h-[45vh] overflow-y-auto rounded-xl bg-[#09090e] p-2"></div>
+    </fieldset>
+    <p id="avisar-erro" class="hidden mx-5 mt-3 text-xs font-semibold text-red-600" role="alert"></p>
+    <div class="flex justify-end gap-2 px-5 py-4 mt-2 border-t border-gray-100">
+      <button type="submit" value="cancelar" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors">Cancelar</button>
+      <button type="submit" value="avisar" id="confirmar-avisar" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors">
+        {% include 'partials/icon.html' with nome='megaphone' classe='w-4 h-4' %}
+        Avisar agora
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Confirmar limpeza -->
+<dialog id="dialogo-limpar" aria-labelledby="dialogo-limpar-titulo"
+        class="p-0 rounded-2xl w-[calc(100%-2rem)] max-w-sm shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm">
+  <form method="dialog" class="flex flex-col">
+    <div class="px-5 pt-5 pb-4">
+      <h2 id="dialogo-limpar-titulo" class="text-base font-bold text-[#50443C]">Limpar o quadro?</h2>
+      <p class="text-sm text-gray-500 mt-1">Todas as linhas somem para todo mundo. Dá para desfazer logo em seguida.</p>
+    </div>
+    <div class="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+      <button type="submit" value="cancelar" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:bg-gray-100 transition-colors">Cancelar</button>
+      <button type="submit" value="limpar" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-700 transition-colors">Limpar quadro</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Avisos rápidos (toasts) desta página -->
+<div id="toasts" class="fixed top-16 lg:top-4 right-4 left-4 sm:left-auto z-[55] flex flex-col gap-2 sm:w-[400px]" aria-live="polite"></div>
+
+{{ estado_inicial|json_script:"estado-inicial" }}
+{{ cores|json_script:"cores-quadro" }}
+
+<template id="tpl-icone-editar">{% include 'partials/icon.html' with nome='edit' classe='w-4 h-4' %}</template>
+<template id="tpl-icone-apagar">{% include 'partials/icon.html' with nome='x' classe='w-4 h-4' %}</template>
+<template id="tpl-icone-ok">{% include 'partials/icon.html' with nome='check-circle' classe='w-5 h-5' %}</template>
+<template id="tpl-icone-erro">{% include 'partials/icon.html' with nome='error' classe='w-5 h-5' %}</template>
+<template id="tpl-icone-desfazer">{% include 'partials/icon.html' with nome='undo' classe='w-3.5 h-3.5' %}</template>
+<template id="tpl-icone-fechar">{% include 'partials/icon.html' with nome='x' classe='w-4 h-4' %}</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var URLS = {
+    escrever: '{% url "quadro_escrever" %}',
+    editar: '{% url "quadro_editar" 0 %}',
+    apagar: '{% url "quadro_apagar" 0 %}',
+    limpar: '{% url "quadro_limpar" %}',
+    restaurar: '{% url "quadro_restaurar" %}',
+    avisar: '{% url "quadro_avisar" %}',
+  };
+  function urlCom(modelo, id) { return modelo.replace('/0/', '/' + id + '/'); }
+  var CORES = JSON.parse(document.getElementById('cores-quadro').textContent);
+  var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  var ao = window.QuadroAoVivo;
+
+  var estado = JSON.parse(document.getElementById('estado-inicial').textContent);
+  var conectados = estado.conectados || [];
+  var editando = null;           // id da linha em edição
+  var ultimaMudanca = 0;         // respostas de consultas anteriores a isso são ignoradas
+  var primeiraVez = true;
+
+  var lista = document.getElementById('linhas');
+  var vazio = document.getElementById('vazio');
+  var form = document.getElementById('form-escrever');
+  var entrada = document.getElementById('nova-linha');
+  var botaoAvisar = document.getElementById('botao-avisar');
+
+  function el(tag, classe, texto) {
+    var e = document.createElement(tag);
+    if (classe) e.className = classe;
+    if (texto != null) e.textContent = texto;
+    return e;
+  }
+  function icone(nome) { return document.getElementById('tpl-icone-' + nome).content.cloneNode(true); }
+  function corEscolhida() { var r = document.querySelector('input[name=cor]:checked'); return r ? r.value : 'rosa'; }
+
+  // ---------- comunicação ----------
+  function enviar(url, corpo) {
+    return fetch(url, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify(corpo || {}),
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) {
+          var erro = new Error(d.erro || (r.status === 403
+            ? 'Sua sessão expirou. Recarregue a página e entre de novo.'
+            : 'Não foi possível salvar. Verifique a conexão e tente de novo.'));
+          erro.status = r.status;
+          throw erro;
+        }
+        return d;
+      });
+    }, function () { throw new Error('Sem conexão com o servidor. Tente de novo em instantes.'); });
+  }
+
+  function aplicar(d) {
+    if (d.quadro) {
+      estado = d.quadro;
+      ao.versao = estado.versao;
+      render();
+    }
+    if (d.conectados) { conectados = d.conectados; renderConectados(); }
+  }
+
+  ao.assinar(estado.versao, function (d, inicio) {
+    if (inicio < ultimaMudanca) { delete d.quadro; }  // resposta antiga, chegou depois de uma alteração nossa
+    aplicar(d);
+  });
+
+  var status = document.getElementById('status');
+  ao.aoMudarStatus = function (s) {
+    var cores = {
+      ok: ['text-emerald-700', 'bg-emerald-400', 'bg-emerald-500', 'Ao vivo'],
+      offline: ['text-amber-700', 'bg-amber-400', 'bg-amber-500', 'Reconectando...'],
+      sessao: ['text-red-700', 'bg-red-400', 'bg-red-500', 'Sessão expirada'],
+    }[s];
+    status.className = status.className.replace(/text-(emerald|amber|red)-700/, cores[0]);
+    status.querySelector('[data-status-ping]').className = 'absolute inline-flex h-full w-full rounded-full opacity-75 ' + cores[1] + (s === 'sessao' ? '' : ' animate-ping');
+    status.querySelector('[data-status-ponto]').className = 'relative inline-flex rounded-full w-2.5 h-2.5 ' + cores[2];
+    status.querySelector('[data-status-texto]').textContent = cores[3];
+    if (s === 'sessao') toast('Sua sessão expirou. Recarregue a página e entre de novo.', 'erro');
+  };
+
+  // ---------- quadro ----------
+  function assinatura(a) { return JSON.stringify(a); }
+
+  function criarLinha(a) {
+    var li = el('li', 'group flex items-start gap-2 sm:gap-3 rounded-2xl px-2 sm:px-3 py-1 hover:bg-white/[.035] transition-colors');
+    li.dataset.id = a.id;
+    li.dataset.assinatura = assinatura(a);
+    var corpo = el('div', 'flex-1 min-w-0');
+    var texto = el('p', 'neon neon-' + a.cor + ' font-quadro text-[28px] sm:text-[36px] leading-[1.15] break-words', a.texto);
+    texto.title = 'Clique duas vezes para editar';
+    texto.dataset.editar = '';
+    corpo.appendChild(texto);
+    var info = a.autor + ' · ' + ao.formatarHora(a.criado_em);
+    if (a.editado_por) info += '  ·  editado por ' + a.editado_por + ' às ' + ao.formatarHora(a.editado_em);
+    corpo.appendChild(el('p', 'text-[11px] font-medium text-white/35 mt-0.5 mb-1', info));
+    li.appendChild(corpo);
+
+    var acoes = el('div', 'flex items-center gap-0.5 pt-2 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity');
+    var editar = el('button', 'p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10');
+    editar.type = 'button'; editar.dataset.botaoEditar = '';
+    editar.setAttribute('aria-label', 'Editar: ' + a.texto);
+    editar.appendChild(icone('editar'));
+    var apagar = el('button', 'p-2 rounded-lg text-white/50 hover:text-red-300 hover:bg-red-500/10');
+    apagar.type = 'button'; apagar.dataset.botaoApagar = '';
+    apagar.setAttribute('aria-label', 'Apagar: ' + a.texto);
+    apagar.appendChild(icone('apagar'));
+    acoes.appendChild(editar); acoes.appendChild(apagar);
+    li.appendChild(acoes);
+    return li;
+  }
+
+  function render() {
+    var anotacoes = estado.anotacoes;
+    var atuais = {};
+    Array.prototype.forEach.call(lista.children, function (li) { atuais[li.dataset.id] = li; });
+
+    if (editando !== null && !anotacoes.some(function (a) { return a.id === editando; })) {
+      editando = null;
+      toast('A linha que você estava editando foi apagada por outra pessoa.', 'erro');
+    }
+
+    var desejados = anotacoes.map(function (a) {
+      var atual = atuais[a.id];
+      if (atual && (a.id === editando || atual.dataset.assinatura === assinatura(a))) return atual;
+      var li = criarLinha(a);
+      if (!atual && !primeiraVez) li.classList.add('linha-nova');
+      return li;
+    });
+    // Remove o que saiu e ajusta a ordem sem tirar do lugar a linha em edição (manteria o foco)
+    Object.keys(atuais).forEach(function (id) { if (desejados.indexOf(atuais[id]) < 0) atuais[id].remove(); });
+    desejados.forEach(function (li, i) { if (lista.children[i] !== li) lista.insertBefore(li, lista.children[i] || null); });
+
+    vazio.classList.toggle('hidden', anotacoes.length > 0);
+    vazio.classList.toggle('flex', anotacoes.length === 0);
+    var semLinhas = anotacoes.length === 0;
+    botaoAvisar.setAttribute('aria-disabled', semLinhas ? 'true' : 'false');
+    botaoAvisar.title = semLinhas ? 'Escreva algo no quadro antes de avisar' : '';
+    renderAvisos();
+    primeiraVez = false;
+  }
+
+  function renderConectados() {
+    var ul = document.getElementById('conectados');
+    ul.replaceChildren();
+    conectados.forEach(function (c) {
+      var li = el('li', 'flex items-center gap-2 min-w-0');
+      li.appendChild(el('span', 'w-2 h-2 rounded-full bg-emerald-500 shrink-0'));
+      li.appendChild(el('span', 'truncate', c.nome));
+      if (c.voce) li.appendChild(el('span', 'text-[10px] font-bold text-gray-400 uppercase tracking-wider', 'você'));
+      ul.appendChild(li);
+    });
+    if (!conectados.length) ul.appendChild(el('li', 'text-xs text-gray-400', 'Ninguém conectado.'));
+    document.getElementById('total-conectados').textContent = conectados.length;
+  }
+
+  function renderAvisos() {
+    var ul = document.getElementById('avisos');
+    ul.replaceChildren();
+    estado.avisos.forEach(function (a) {
+      var li = el('li', 'flex flex-col gap-1');
+      li.appendChild(el('p', 'text-[11px] font-semibold text-gray-400', a.autor + ' · ' + ao.formatarHora(a.criado_em)));
+      var caixa = el('div', 'rounded-xl bg-[#09090e] px-3 py-1.5');
+      a.linhas.slice(0, 3).forEach(function (l) {
+        caixa.appendChild(el('p', 'neon neon-fraco neon-' + l.cor + ' font-quadro text-xl leading-snug break-words', l.texto));
+      });
+      var resto = a.linhas.length - 3;
+      if (resto > 0) caixa.appendChild(el('p', 'text-[11px] text-white/40', '+ ' + resto + (resto === 1 ? ' linha' : ' linhas')));
+      li.appendChild(caixa);
+      ul.appendChild(li);
+    });
+    if (!estado.avisos.length) ul.appendChild(el('li', 'text-xs text-gray-400', 'Nenhum aviso enviado ainda.'));
+  }
+
+  // ---------- escrever ----------
+  var enviando = false;
+  function pintarEntrada() { entrada.className = entrada.className.replace(/neon-\w+/, 'neon-' + corEscolhida()); }
+  document.querySelectorAll('input[name=cor]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      pintarEntrada();
+      try { localStorage.setItem('quadro.cor', r.value); } catch (e) {}
+      entrada.focus();
+    });
+  });
+  try {
+    var corSalva = localStorage.getItem('quadro.cor');
+    var radio = corSalva && document.querySelector('input[name=cor][value="' + corSalva + '"]');
+    if (radio) { radio.checked = true; pintarEntrada(); }
+  } catch (e) {}
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var texto = entrada.value.trim();
+    if (!texto) { tremer(entrada); entrada.focus(); return; }
+    if (enviando) return;
+    enviando = true;
+    enviar(URLS.escrever, { texto: texto, cor: corEscolhida() })
+      .then(function (d) {
+        entrada.value = '';
+        ultimaMudanca = Date.now();
+        aplicar(d);
+      })
+      .catch(function (err) { toast(err.message, 'erro'); })
+      .then(function () { enviando = false; entrada.focus(); });
+  });
+
+  function tremer(alvo) {
+    alvo.classList.remove('tremer'); void alvo.offsetWidth; alvo.classList.add('tremer');
+  }
+
+  // ---------- editar e apagar ----------
+  lista.addEventListener('click', function (e) {
+    var li = e.target.closest('li[data-id]');
+    if (!li) return;
+    var id = Number(li.dataset.id);
+    if (e.target.closest('[data-botao-editar]')) abrirEdicao(li, id);
+    else if (e.target.closest('[data-botao-apagar]')) apagar(id);
+  });
+  lista.addEventListener('dblclick', function (e) {
+    var alvo = e.target.closest('[data-editar]');
+    if (alvo) abrirEdicao(alvo.closest('li'), Number(alvo.closest('li').dataset.id));
+  });
+
+  function abrirEdicao(li, id) {
+    if (editando !== null && editando !== id) fecharEdicao();
+    var a = estado.anotacoes.filter(function (x) { return x.id === id; })[0];
+    if (!a) return;
+    editando = id;
+    li.dataset.assinatura = '';
+    var f = el('form', 'flex-1 min-w-0 flex flex-col gap-2 py-1');
+    f.noValidate = true;
+    var campo = el('input', 'neon neon-' + a.cor + ' font-quadro w-full bg-white/[.04] rounded-xl px-2 text-[28px] sm:text-[36px] leading-tight outline-none ring-1 ring-white/20 focus:ring-white/50');
+    campo.value = a.texto; campo.maxLength = {{ max_texto }};
+    campo.setAttribute('aria-label', 'Texto da linha');
+    f.appendChild(campo);
+
+    var barra = el('div', 'flex items-center gap-2 flex-wrap');
+    var cores = el('div', 'flex items-center gap-1.5 mr-auto');
+    cores.setAttribute('role', 'radiogroup'); cores.setAttribute('aria-label', 'Cor da linha');
+    var corAtual = a.cor;
+    CORES.forEach(function (c) {
+      var b = el('button', 'neon-' + c[0] + ' w-6 h-6 rounded-full ring-2 ring-offset-2 ring-offset-[#07070c] transition-transform');
+      b.type = 'button';
+      b.style.background = 'var(--neon)';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', c[1]);
+      function marcar() {
+        cores.querySelectorAll('button').forEach(function (x) {
+          var ativo = x === b;
+          x.setAttribute('aria-checked', ativo ? 'true' : 'false');
+          x.classList.toggle('ring-white', ativo); x.classList.toggle('ring-transparent', !ativo);
+          x.classList.toggle('scale-110', ativo);
+        });
+      }
+      b.addEventListener('click', function () {
+        corAtual = c[0]; marcar();
+        campo.className = campo.className.replace(/neon-\w+/, 'neon-' + corAtual);
+        campo.focus();
+      });
+      cores.appendChild(b);
+      if (c[0] === a.cor) setTimeout(marcar);
+    });
+    barra.appendChild(cores);
+    var cancelar = el('button', 'px-3 py-1.5 rounded-lg text-xs font-semibold text-white/60 hover:text-white hover:bg-white/10', 'Cancelar');
+    cancelar.type = 'button';
+    cancelar.addEventListener('click', fecharEdicao);
+    var salvar = el('button', 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-[#09090e] hover:bg-white/85', 'Salvar');
+    salvar.type = 'submit';
+    barra.appendChild(cancelar); barra.appendChild(salvar);
+    f.appendChild(barra);
+
+    campo.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); fecharEdicao(); } });
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var texto = campo.value.trim();
+      if (!texto) { tremer(campo); return; }
+      enviar(urlCom(URLS.editar, id), { texto: texto, cor: corAtual })
+        .then(function (d) { editando = null; ultimaMudanca = Date.now(); aplicar(d); focarLinha(id); })
+        .catch(function (err) {
+          toast(err.message, 'erro');
+          if (err.status === 404) fecharEdicao();
+        });
+    });
+
+    li.replaceChildren(f);
+    campo.focus();
+    campo.setSelectionRange(campo.value.length, campo.value.length);
+  }
+
+  function fecharEdicao() {
+    var id = editando;
+    editando = null;
+    render();
+    focarLinha(id);
+  }
+
+  function focarLinha(id) {
+    var b = lista.querySelector('li[data-id="' + id + '"] [data-botao-editar]');
+    if (b) b.focus({ preventScroll: true });
+  }
+
+  function apagar(id) {
+    enviar(urlCom(URLS.apagar, id))
+      .then(function (d) {
+        ultimaMudanca = Date.now();
+        aplicar(d);
+        if (d.apagadas && d.apagadas.length) toastDesfazer('Linha apagada.', d.apagadas);
+        entrada.focus({ preventScroll: true });
+      })
+      .catch(function (err) { toast(err.message, 'erro'); });
+  }
+
+  // ---------- limpar ----------
+  var dialogoLimpar = document.getElementById('dialogo-limpar');
+  document.getElementById('botao-limpar').addEventListener('click', function () {
+    if (!estado.anotacoes.length) { toast('O quadro já está limpo.', 'ok'); return; }
+    dialogoLimpar.showModal();
+  });
+  dialogoLimpar.addEventListener('close', function () {
+    if (dialogoLimpar.returnValue !== 'limpar') return;
+    dialogoLimpar.returnValue = '';
+    enviar(URLS.limpar)
+      .then(function (d) {
+        ultimaMudanca = Date.now();
+        aplicar(d);
+        if (d.apagadas && d.apagadas.length) toastDesfazer('Quadro limpo.', d.apagadas);
+      })
+      .catch(function (err) { toast(err.message, 'erro'); });
+  });
+
+  function desfazer(ids) {
+    return enviar(URLS.restaurar, { ids: ids })
+      .then(function (d) { ultimaMudanca = Date.now(); aplicar(d); })
+      .catch(function (err) { toast(err.message, 'erro'); });
+  }
+
+  // ---------- avisar ----------
+  var dialogoAvisar = document.getElementById('dialogo-avisar');
+  var linhasAvisar = document.getElementById('avisar-linhas');
+  var erroAvisar = document.getElementById('avisar-erro');
+  var confirmarAvisar = document.getElementById('confirmar-avisar');
+
+  function nomesEmTexto(nomes) {
+    if (nomes.length <= 1) return nomes.join('');
+    if (nomes.length > 4) return nomes.slice(0, 3).join(', ') + ' e mais ' + (nomes.length - 3);
+    return nomes.slice(0, -1).join(', ') + ' e ' + nomes[nomes.length - 1];
+  }
+
+  botaoAvisar.addEventListener('click', function () {
+    if (!estado.anotacoes.length) {
+      toast('Escreva algo no quadro antes de avisar.', 'erro');
+      tremer(entrada); entrada.focus();
+      return;
+    }
+    var outros = conectados.filter(function (c) { return !c.voce; }).map(function (c) { return c.nome; });
+    document.getElementById('avisar-destino').textContent = outros.length
+      ? 'Vai aparecer na tela e ser lido em voz alta para ' + (outros.length === 1 ? '1 pessoa' : outros.length + ' pessoas') + ': ' + nomesEmTexto(outros) + '.'
+      : 'Ninguém mais está conectado agora. Quem abrir o sistema nos próximos 10 minutos recebe o aviso.';
+    linhasAvisar.replaceChildren();
+    estado.anotacoes.forEach(function (a) {
+      var rotulo = el('label', 'flex items-start gap-3 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer');
+      var caixa = el('input', 'mt-3 w-4 h-4 shrink-0 accent-[#E94920]');
+      caixa.type = 'checkbox'; caixa.checked = true; caixa.value = a.id;
+      rotulo.appendChild(caixa);
+      rotulo.appendChild(el('span', 'neon neon-' + a.cor + ' font-quadro text-2xl leading-tight break-words min-w-0', a.texto));
+      linhasAvisar.appendChild(rotulo);
+    });
+    erroAvisar.classList.add('hidden');
+    dialogoAvisar.showModal();
+    confirmarAvisar.focus();
+  });
+
+  document.getElementById('form-avisar').addEventListener('submit', function (e) {
+    if (e.submitter && e.submitter.value !== 'avisar') return;  // Cancelar fecha normalmente
+    e.preventDefault();
+    var ids = Array.prototype.map.call(linhasAvisar.querySelectorAll('input:checked'), function (c) { return Number(c.value); });
+    if (!ids.length) {
+      erroAvisar.textContent = 'Marque pelo menos uma linha.';
+      erroAvisar.classList.remove('hidden');
+      return;
+    }
+    if (confirmarAvisar.hasAttribute('data-carregando')) return;
+    confirmarAvisar.setAttribute('data-carregando', '');
+    enviar(URLS.avisar, { ids: ids })
+      .then(function (d) {
+        dialogoAvisar.close();
+        ultimaMudanca = Date.now();
+        aplicar(d);
+        toast(d.avisados
+          ? 'Aviso enviado para ' + (d.avisados === 1 ? '1 pessoa conectada.' : d.avisados + ' pessoas conectadas.')
+          : 'Aviso enviado. Ninguém mais está conectado agora; quem entrar nos próximos 10 minutos vai receber.', 'ok');
+      })
+      .catch(function (err) {
+        erroAvisar.textContent = err.message;
+        erroAvisar.classList.remove('hidden');
+      })
+      .then(function () { confirmarAvisar.removeAttribute('data-carregando'); });
+  });
+
+  // ---------- avisos neste computador ----------
+  var vozAlta = document.getElementById('ler-em-voz-alta');
+  vozAlta.checked = ao.vozAtiva();
+  vozAlta.addEventListener('change', function () { ao.definirVoz(vozAlta.checked); });
+  document.getElementById('testar-voz').addEventListener('click', function () { ao.testar(); });
+
+  var blocoNotif = document.getElementById('notificacoes-sistema');
+  var botaoNotif = document.getElementById('ativar-notificacoes');
+  var textoNotif = document.getElementById('estado-notificacoes');
+  function atualizarNotificacoes() {
+    if (!('Notification' in window)) return;
+    blocoNotif.classList.remove('hidden'); blocoNotif.classList.add('flex');
+    var p = Notification.permission;
+    botaoNotif.classList.toggle('hidden', p !== 'default');
+    botaoNotif.classList.toggle('inline-flex', p === 'default');
+    textoNotif.textContent = p === 'granted'
+      ? 'Notificações ativadas: o aviso aparece mesmo com o navegador minimizado.'
+      : p === 'denied'
+        ? 'As notificações estão bloqueadas neste navegador. Para liberar, clique no cadeado ao lado do endereço do site.'
+        : 'Recomendado: assim o aviso aparece no canto da tela mesmo quando você está em outro programa.';
+  }
+  botaoNotif.addEventListener('click', function () {
+    var pedido = Notification.requestPermission(atualizarNotificacoes);
+    if (pedido && pedido.then) pedido.then(atualizarNotificacoes);
+  });
+  atualizarNotificacoes();
+
+  // ---------- toasts ----------
+  var caixaToasts = document.getElementById('toasts');
+  function toast(mensagem, tipo, acao) {
+    var erro = tipo === 'erro';
+    var t = el('div', 'toast flex items-center gap-3 pl-4 pr-2 py-3 rounded-2xl border shadow-lg text-sm font-medium bg-white ' +
+      (erro ? 'border-red-200 text-red-700' : 'border-emerald-200 text-emerald-800'));
+    t.setAttribute('role', erro ? 'alert' : 'status');
+    var ic = el('span', 'shrink-0 ' + (erro ? 'text-red-500' : 'text-emerald-500'));
+    ic.appendChild(icone(erro ? 'erro' : 'ok'));
+    t.appendChild(ic);
+    t.appendChild(el('span', 'flex-1 leading-snug', mensagem));
+    function fechar() { if (!t.isConnected) return; t.style.transition = 'opacity .2s'; t.style.opacity = '0'; setTimeout(function () { t.remove(); }, 200); }
+    if (acao) {
+      var b = el('button', 'inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#E94920] hover:bg-orange-50 shrink-0');
+      b.type = 'button';
+      b.appendChild(icone('desfazer'));
+      b.appendChild(document.createTextNode(acao.rotulo));
+      b.addEventListener('click', function () { fechar(); acao.executar(); });
+      t.appendChild(b);
+    }
+    var x = el('button', 'p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 shrink-0');
+    x.type = 'button'; x.setAttribute('aria-label', 'Fechar aviso');
+    x.appendChild(icone('fechar'));
+    x.addEventListener('click', fechar);
+    t.appendChild(x);
+    caixaToasts.appendChild(t);
+    setTimeout(fechar, acao ? 8000 : (erro ? 7000 : 5000));
+  }
+  function toastDesfazer(mensagem, ids) {
+    toast(mensagem, 'ok', { rotulo: 'Desfazer', executar: function () { desfazer(ids); } });
+  }
+
+  render();
+  renderConectados();
+})();
+</script>
+{% endblock %}

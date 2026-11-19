@@ -22,6 +22,25 @@ As regras ficam em [`apps/plantao/escala.py`](apps/plantao/escala.py)
 (`MAX_DIAS_SEGUIDOS`, `DIAS_EXPEDIENTE`, `MIN_COLABORADORES`). Elas também são verificadas
 no cadastro manual (aviso), nas trocas (bloqueio) e no dashboard (alertas).
 
+## Quadro do NOC
+
+Página `/plantao/quadro/` (menu **Quadro do NOC**), aberta a qualquer usuário logado. Funciona como o
+quadro branco do SAC: cada linha é um aviso (ex.: `Vila Militar 1/1/1 fora`), com cor de caneta neon.
+Escrever, editar e apagar aparece para todos em até ~2 s. Apagar e limpar o quadro podem ser desfeitos.
+
+**Avisar** abre um aviso em tela, com som e leitura em voz alta das linhas escolhidas, para todos
+os usuários com o sistema aberto (em qualquer página). Quem abrir o sistema nos 10 minutos seguintes
+também recebe. Na leitura, `1/1/1` vira "1 barra 1 barra 1", para não ser lido como data.
+
+- Tempo real por consulta periódica (`/plantao/quadro/novidades/`, a cada 5 s em qualquer página e a
+  cada 2 s na página do quadro). Não precisa de WebSocket, Redis nem mudança no `entrypoint.sh`.
+- O navegador só libera som/voz depois que a pessoa clica em algo na página. Se estiver bloqueado,
+  o aviso aparece com o botão **Ouvir aviso**. As notificações da área de trabalho (ativadas na página
+  do quadro) aparecem mesmo com o navegador minimizado.
+- Código: [`apps/plantao/quadro.py`](apps/plantao/quadro.py),
+  [`templates/dashboard/quadro.html`](templates/dashboard/quadro.html) e
+  [`templates/partials/quadro_ao_vivo.html`](templates/partials/quadro_ao_vivo.html) (incluído no `base.html`).
+
 ## Desenvolvimento local
 
 ```powershell

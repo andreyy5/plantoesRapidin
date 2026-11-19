@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Colaborador, Plantao, EscalaAutomatica, TrocaPlantao, Notificacao, TecnicoCampo, PlantaoTecnico, TrocaPlantaoTecnico, EscalaAutomaticaTecnico
+from .models import (
+    Colaborador, Plantao, EscalaAutomatica, TrocaPlantao, Notificacao, TecnicoCampo, PlantaoTecnico, TrocaPlantaoTecnico, EscalaAutomaticaTecnico,
+    AnotacaoQuadro, AlertaQuadro,
+)
 
 
 @admin.register(Colaborador)
@@ -104,3 +107,17 @@ class TrocaPlantaoTecnicoAdmin(admin.ModelAdmin):
 class EscalaAutomaticaTecnicoAdmin(admin.ModelAdmin):
     list_display = ['data_inicio', 'semanas_gerar', 'criada_por', 'criada_em']
     list_filter = ['criada_em']
+
+
+@admin.register(AnotacaoQuadro)
+class AnotacaoQuadroAdmin(admin.ModelAdmin):
+    list_display = ['texto', 'cor', 'criado_por', 'criado_em', 'apagado_em']
+    list_filter = ['cor', ('apagado_em', admin.EmptyFieldListFilter)]
+    search_fields = ['texto']
+    readonly_fields = ['criado_em', 'editado_em', 'atualizado_em']
+
+
+@admin.register(AlertaQuadro)
+class AlertaQuadroAdmin(admin.ModelAdmin):
+    list_display = ['__str__', 'criado_por', 'criado_em']
+    readonly_fields = ['criado_em']

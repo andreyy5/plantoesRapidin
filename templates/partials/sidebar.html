@@ -37,6 +37,7 @@
 
   {% if nav_area == 'tecnicos' %}
     {% url 'dashboard_tecnicos' as u %}{% include 'partials/nav_item.html' with url=u chave='tec_escala' label='Escala de técnicos' icone='grid' %}
+    {% url 'quadro' as u %}{% include 'partials/nav_item.html' with url=u|add:'?area=tecnicos' chave='quadro' label='Quadro do NOC' icone='board' contador='quadro' %}
     {% if is_admin %}
     <p class="px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-600">Gestão</p>
     {% url 'cadastrar_plantao_tecnico' as u %}{% include 'partials/nav_item.html' with url=u chave='tec_novo' label='Novo plantão' icone='calendar' %}
@@ -51,6 +52,7 @@
     {% else %}
       {% include 'partials/nav_item.html' with url=u chave='sac_escala' label='Meus plantões' icone='grid' %}
     {% endif %}
+    {% url 'quadro' as u %}{% include 'partials/nav_item.html' with url=u chave='quadro' label='Quadro do NOC' icone='board' contador='quadro' %}
     {% if is_colaborador %}
     {% url 'notificacoes' as u %}{% include 'partials/nav_item.html' with url=u chave='sac_notif' label='Notificações' icone='bell' badge=notificacoes_nao_lidas %}
     {% url 'minhas_trocas' as u %}{% include 'partials/nav_item.html' with url=u chave='sac_trocas' label='Trocas' icone='swap' %}

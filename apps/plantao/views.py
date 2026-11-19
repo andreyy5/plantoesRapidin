@@ -994,7 +994,10 @@ _NAV_ITEM_POR_ROTA = {
     'gerar_escala_tecnicos': 'tec_gerar',
     'gerenciar_tecnicos': 'tec_lista', 'cadastrar_tecnico': 'tec_lista', 'editar_tecnico': 'tec_lista',
     'relatorios': 'relatorios',
+    'quadro': 'quadro',
 }
+# Itens que existem nas duas áreas do menu (SAC e técnicos)
+_NAV_ITENS_COMPARTILHADOS = ('relatorios', 'quadro')
 
 
 def notificacoes_processor(request):
@@ -1012,7 +1015,7 @@ def notificacoes_processor(request):
         'nav_ativo': nav_ativo,
         'nav_area': 'tecnicos' if (
             nav_ativo.startswith('tec_')
-            or (nav_ativo == 'relatorios' and request.GET.get('area') == 'tecnicos')
+            or (nav_ativo in _NAV_ITENS_COMPARTILHADOS and request.GET.get('area') == 'tecnicos')
         ) else 'sac',
     }
     # Destino seguro para botões "Voltar"/"Cancelar" (?voltar_para=...)
@@ -1033,6 +1036,9 @@ def notificacoes_processor(request):
         'is_colaborador': user_type == 'colaborador',
         'is_tecnico': user_type == 'tecnico',
     })
+    # Técnico que abre o quadro continua vendo o menu dos técnicos
+    if user_type == 'tecnico' and nav_ativo in _NAV_ITENS_COMPARTILHADOS:
+        contexto['nav_area'] = 'tecnicos'
     colaborador = get_user_colaborador(user)
     if colaborador:
         contexto['notificacoes_nao_lidas'] = Notificacao.objects.filter(

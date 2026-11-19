@@ -453,3 +453,151 @@ class DomingoEmDuplaTests(TestCase):
         horas = {l.nome: l.horas for l in resp.context['dados']['resumo']}
         self.assertEqual(horas, {'Téc 1': 10, 'Téc 2': 10})
         self.assertEqual(resp.context['dados']['semanas'][0]['itens'][0]['tipo'], 'Domingo · Dupla')
+
+
+class QuadroNocTests(TestCase):
+    def setUp(self):
+        from .models import TecnicoCampo
+        self.noc = User.objects.create_user('noc', password='x', first_name='Pessoa', last_name='NOC')
+        self.sac_user = User.objects.create_user('sac', password='x', first_name='Ana')
+        Colaborador.objects.create(nome_completo='Ana', user=self.sac_user)
+        self.tec_user = User.objects.create_user('tec', password='x')
+        TecnicoCampo.objects.create(nome_completo='Téc', user=self.tec_user)
+
+    def _post(self, nome, dados=None, *args, user=None):
+        import json
+        self.client.force_login(user or self.noc)
+        return self.client.post(reverse(nome, args=args), json.dumps(dados or {}),
+                                content_type='application/json')
+
+    def _novidades(self, user, **params):
+        self.client.force_login(user)
+        return self.client.get(reverse('quadro_novidades'), params).json()
+
+    def test_pagina_abre_para_qualquer_usuario_logado(self):
+        for user in (self.noc, self.sac_user, self.tec_user):
+            self.client.force_login(user)
+            resp = self.client.get(reverse('quadro'))
+            self.assertContains(resp, 'Quadro do NOC')
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('quadro')).status_code, 302)
+
+    def test_tecnico_continua_no_menu_dos_tecnicos(self):
+        self.client.force_login(self.tec_user)
+        resp = self.client.get(reverse('quadro'))
+        self.assertEqual(resp.context['nav_area'], 'tecnicos')
+        self.assertEqual(resp.context['nav_ativo'], 'quadro')
+
+    def test_chamadas_sem_login_respondem_401_em_json(self):
+        resp = self.client.get(reverse('quadro_novidades'))
+        self.assertEqual(resp.status_code, 401)
+        self.assertIn('erro', resp.json())
+
+    def test_escrever_editar_apagar_e_desfazer(self):
+        from .models import AnotacaoQuadro
+        resp = self._post('quadro_escrever', {'texto': '  Vila Militar   1/1/1 fora ', 'cor': 'ciano'})
+        self.assertEqual(resp.status_code, 200)
+        linha = resp.json()['quadro']['anotacoes'][0]
+        self.assertEqual((linha['texto'], linha['cor'], linha['autor']),
+                         ('Vila Militar 1/1/1 fora', 'ciano', 'Pessoa NOC'))
+        self.assertIsNone(linha['editado_por'])
+
+        resp = self._post('quadro_editar', {'texto': 'Vila Militar 1/1/1 normalizado'}, linha['id'],
+                          user=self.sac_user)
+        linha = resp.json()['quadro']['anotacoes'][0]
+        self.assertEqual((linha['texto'], linha['editado_por']), ('Vila Militar 1/1/1 normalizado', 'Ana'))
+
+        resp = self._post('quadro_apagar', None, linha['id'])
+        self.assertEqual(resp.json()['quadro']['anotacoes'], [])
+        self.assertEqual(resp.json()['apagadas'], [linha['id']])
+        self.assertIsNotNone(AnotacaoQuadro.objects.get(id=linha['id']).apagado_em)
+
+        resp = self._post('quadro_restaurar', {'ids': [linha['id']]})
+        self.assertEqual([a['id'] for a in resp.json()['quadro']['anotacoes']], [linha['id']])
+
+    def test_validacoes_ao_escrever(self):
+        self.assertEqual(self._post('quadro_escrever', {'texto': '   '}).status_code, 400)
+        self.assertEqual(self._post('quadro_escrever', {'texto': 'x' * 201}).status_code, 400)
+        resp = self._post('quadro_escrever', {'texto': 'ok', 'cor': '<script>'})
+        self.assertEqual(resp.json()['quadro']['anotacoes'][0]['cor'], 'rosa')
+        self.assertEqual(self._post('quadro_editar', {'texto': ''}, resp.json()['id']).status_code, 400)
+        self.assertEqual(self._post('quadro_editar', {'texto': 'a'}, 9999).status_code, 404)
+        self.assertEqual(self.client.get(reverse('quadro_escrever')).status_code, 405)
+
+    def test_limpar_quadro_e_desfazer(self):
+        for t in ('A', 'B'):
+            self._post('quadro_escrever', {'texto': t})
+        resp = self._post('quadro_limpar')
+        ids = resp.json()['apagadas']
+        self.assertEqual(len(ids), 2)
+        self.assertEqual(resp.json()['quadro']['anotacoes'], [])
+        resp = self._post('quadro_restaurar', {'ids': ids})
+        self.assertEqual([a['texto'] for a in resp.json()['quadro']['anotacoes']], ['A', 'B'])
+
+    def test_novidades_so_devolve_o_quadro_quando_muda(self):
+        d = self._novidades(self.sac_user, versao='')
+        versao = d['quadro']['versao']
+        self.assertNotIn('quadro', self._novidades(self.sac_user, versao=versao))
+        self._post('quadro_escrever', {'texto': 'Centro 1/12 fora parcialmente'})
+        d = self._novidades(self.sac_user, versao=versao)
+        self.assertEqual(d['quadro']['anotacoes'][0]['texto'], 'Centro 1/12 fora parcialmente')
+        self.assertEqual(d['linhas_no_quadro'], 1)
+        # Páginas comuns (sem versao) não recebem o quadro, só o contador
+        self.assertNotIn('quadro', self._novidades(self.sac_user))
+
+    def test_aviso_chega_para_os_outros_conectados(self):
+        primeira = self._novidades(self.sac_user)  # abriu o sistema: só registra o último aviso
+        self.assertIsNone(primeira['alerta'])
+        self._post('quadro_escrever', {'texto': 'Vila Militar 1/1/1 fora', 'cor': 'verde'})
+        self._post('quadro_escrever', {'texto': 'Centro 1/12 fora parcialmente'})
+        resp = self._post('quadro_avisar')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['avisados'], 1)  # a Ana está conectada
+
+        d = self._novidades(self.sac_user, alerta=primeira['ultimo_alerta'])
+        self.assertEqual(d['alerta']['autor'], 'Pessoa NOC')
+        self.assertEqual([l['texto'] for l in d['alerta']['linhas']],
+                         ['Vila Militar 1/1/1 fora', 'Centro 1/12 fora parcialmente'])
+        self.assertEqual(d['alerta']['linhas'][0]['cor'], 'verde')
+        # Já visto: não repete
+        self.assertIsNone(self._novidades(self.sac_user, alerta=d['ultimo_alerta'])['alerta'])
+        # Quem avisou não recebe o próprio aviso
+        self.assertIsNone(self._novidades(self.noc, alerta=0)['alerta'])
+        # Quem acabou de abrir o sistema (sem histórico) também não
+        self.assertIsNone(self._novidades(self.tec_user)['alerta'])
+
+    def test_avisar_so_as_linhas_escolhidas(self):
+        ids = [self._post('quadro_escrever', {'texto': t}).json()['id'] for t in ('A', 'B', 'C')]
+        self._post('quadro_avisar', {'ids': [ids[1]]})
+        d = self._novidades(self.sac_user, alerta=0)
+        self.assertEqual([l['texto'] for l in d['alerta']['linhas']], ['B'])
+
+    def test_aviso_antigo_nao_aparece(self):
+        from .models import AlertaQuadro
+        self._post('quadro_escrever', {'texto': 'A'})
+        self._post('quadro_avisar')
+        AlertaQuadro.objects.update(criado_em=timezone.now() - timedelta(minutes=11))
+        self.assertIsNone(self._novidades(self.sac_user, alerta=0)['alerta'])
+
+    def test_avisar_com_quadro_vazio_ou_em_sequencia(self):
+        self.assertEqual(self._post('quadro_avisar').status_code, 400)
+        self._post('quadro_escrever', {'texto': 'A'})
+        self.assertEqual(self._post('quadro_avisar').status_code, 200)
+        resp = self._post('quadro_avisar', user=self.sac_user)
+        self.assertEqual(resp.status_code, 429)
+        self.assertIn('Pessoa NOC acabou de enviar', resp.json()['erro'])
+
+    def test_conectados(self):
+        from .models import PresencaUsuario
+        self._novidades(self.sac_user)
+        d = self._novidades(self.noc, versao='')
+        self.assertEqual({c['nome']: c['voce'] for c in d['conectados']}, {'Ana': False, 'Pessoa NOC': True})
+        PresencaUsuario.objects.filter(user=self.sac_user).update(visto_em=timezone.now() - timedelta(minutes=5))
+        d = self._novidades(self.noc, versao='')
+        self.assertEqual([c['nome'] for c in d['conectados']], ['Pessoa NOC'])
+
+    def test_menu_tem_o_quadro_e_a_consulta_ao_vivo(self):
+        self.client.force_login(self.sac_user)
+        resp = self.client.get(reverse('minhas_trocas'))
+        self.assertContains(resp, reverse('quadro'))
+        self.assertContains(resp, reverse('quadro_novidades'))
