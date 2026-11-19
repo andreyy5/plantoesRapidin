@@ -238,6 +238,8 @@ def novidades(request):
     ?alerta=<id>  último aviso que este navegador já viu. Sem ele, só devolve o id
                   do último aviso (quem acabou de abrir o sistema não recebe aviso antigo).
     ?versao=<v>   enviado só pela página do quadro; se o quadro mudou, devolve o estado novo.
+    ?tv=1         modo TV: recebe também os avisos enviados pelo próprio usuário (a TV costuma
+                  ficar logada com a mesma conta de quem avisa).
     """
     _marcar_presenca(request.user)
     ultimo_id = AlertaQuadro.objects.values_list('id', flat=True).first() or 0
@@ -250,13 +252,10 @@ def novidades(request):
 
     visto = request.GET.get('alerta', '')
     if visto.isdigit() and int(visto) < ultimo_id:
-        novo = (
-            AlertaQuadro.objects
-            .filter(id__gt=int(visto), criado_em__gte=timezone.now() - VALIDADE_ALERTA)
-            .exclude(criado_por=request.user)
-            .select_related('criado_por')
-            .first()  # o mais recente
-        )
+        avisos = AlertaQuadro.objects.filter(id__gt=int(visto), criado_em__gte=timezone.now() - VALIDADE_ALERTA)
+        if request.GET.get('tv') != '1':
+            avisos = avisos.exclude(criado_por=request.user)
+        novo = avisos.select_related('criado_por').first()  # o mais recente
         if novo:
             resposta['alerta'] = _alerta_json(novo)
 

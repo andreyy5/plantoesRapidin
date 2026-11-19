@@ -31,8 +31,26 @@ Escrever, editar e apagar aparece para todos em até ~2 s. Apagar e limpar o qua
 Ferramentas: **Texto** (digitar), **Caneta** (escrever/desenhar com mouse, caneta ou dedo),
 **Linha**, **Seta**, **Retângulo** e **Círculo** (com Shift: 45°, quadrado, círculo perfeito) e
 **Apagador** (apaga traços e formas). `Ctrl+Z` desfaz o seu último traço. **Expandir** abre o quadro
-em tela cheia (bom para uma TV na parede). Texto e desenho são medidos em % da largura do quadro, então
+em tela cheia, com as ferramentas. Texto e desenho são medidos em % da largura do quadro, então
 ficam no mesmo lugar em qualquer tamanho de tela.
+
+### Modo TV
+
+Botão **Modo TV** ou o endereço `/plantao/quadro/?modo=tv` (para deixar salvo no computador da TV).
+Mostra só o quadro, com data e hora, sem ferramentas; o cursor some, a tela não apaga (Wake Lock) e
+os avisos aparecem **dentro** do quadro, sem sair da tela cheia. A TV recebe também os avisos enviados
+com a mesma conta em que está logada. Se a tela cheia cair (ex.: alguém apertou Esc), o quadro continua
+ocupando a janela e aparece o botão "Tela cheia" ao mexer o mouse.
+
+Aberto direto pelo endereço, pede um clique em **Iniciar modo TV** (o navegador só libera tela cheia e
+som depois de um clique). Para a TV não precisar de nenhum clique, crie um atalho do Edge assim:
+
+```
+"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --start-fullscreen --autoplay-policy=no-user-gesture-required "https://plantoes.rapidin.net.br/plantao/quadro/?modo=tv"
+```
+
+(feche o Edge antes de usar o atalho; `--start-fullscreen` é a tela cheia do navegador, a mesma do F11,
+que não sai sozinha).
 
 **Avisar** abre um aviso em tela, com som e leitura em voz alta (duas vezes) das linhas escolhidas,
 para todos os usuários com o sistema aberto (em qualquer página). O aviso fica 30 segundos na tela e

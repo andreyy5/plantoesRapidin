@@ -78,15 +78,33 @@
     flex: 1; min-height: 0; display: flex; flex-direction: column; margin-inline: auto;
     width: min(100%, calc((100vh - 250px) * 16 / 9));
   }
-  .quadro-expandido .neon-moldura,
-  .quadro-expandido .neon-moldura__borda,
+  /* Só a moldura do quadro (o aviso, que também fica dentro da seção, tem regras próprias) */
+  .quadro-expandido #moldura,
+  .quadro-expandido #moldura > .neon-moldura__borda,
   .quadro-expandido .quadro-rolagem,
   .quadro-expandido .quadro-container { display: flex; flex-direction: column; }
-  .quadro-expandido .neon-moldura, .quadro-expandido .neon-moldura__borda,
+  .quadro-expandido #moldura, .quadro-expandido #moldura > .neon-moldura__borda,
   .quadro-expandido .quadro-superficie, .quadro-expandido .quadro-rolagem { flex: 1; min-height: 0; }
   .quadro-expandido .quadro-container, .quadro-expandido .quadro-area { flex: 1 0 auto; }
   .so-expandido { display: none; }
   .quadro-expandido .so-expandido { display: inline-flex; }
+
+  /* ---------- modo TV: só o quadro, sem ferramentas ---------- */
+  .quadro-secao [hidden] { display: none !important; }
+  .so-tv { display: none; }
+  .modo-tv .so-tv { display: inline-flex; }
+  .modo-tv .esconder-tv { display: none !important; }
+  .modo-tv.quadro-expandido .quadro-palco { width: min(100%, calc((100vh - 110px) * 16 / 9)); }
+  .modo-tv .linha-acoes { display: none; }
+  .modo-tv .linha:hover { background: none; }
+  .modo-tv .controle-tv { opacity: 0; transition: opacity .3s; }
+  .modo-tv.mostrar-controles .controle-tv, .modo-tv .controle-tv:focus-visible { opacity: 1; }
+  .modo-tv.cursor-oculto, .modo-tv.cursor-oculto * { cursor: none !important; }
+  /* Já estamos no quadro: "Abrir quadro" só recarregaria a página (e sairia da tela cheia) */
+  .quadro-secao #alerta-quadro a[href] { display: none; }
+  /* Na TV ninguém clica no aviso: fica só a contagem dos 30 segundos */
+  .modo-tv #alerta-quadro [data-alerta-ouvir], .modo-tv #alerta-quadro a[href],
+  .modo-tv #alerta-quadro [data-alerta-fechar] { display: none; }
 
   @media (prefers-reduced-motion: reduce) { .linha-nova .neon, .tremer { animation: none; } }
 </style>
@@ -113,7 +131,7 @@
         {% include 'partials/icon.html' with nome='board' classe='w-5 h-5 text-orange-400' %}
         Quadro Rapidin
       </span>
-      <div role="group" aria-label="Ferramenta" class="inline-flex items-center gap-0.5 p-1 rounded-xl bg-white border border-gray-200/80 shadow-sm">
+      <div role="group" aria-label="Ferramenta" class="esconder-tv inline-flex items-center gap-0.5 p-1 rounded-xl bg-white border border-gray-200/80 shadow-sm">
         {% for valor, rotulo, dica, icone in ferramentas %}
         {% if valor == 'caneta' or valor == 'apagador' %}<span class="w-px h-5 mx-0.5 bg-gray-200" aria-hidden="true"></span>{% endif %}
         <button type="button" data-ferramenta="{{ valor }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}" title="{{ dica }}" aria-label="{{ rotulo }}"
@@ -122,6 +140,7 @@
         </button>
         {% endfor %}
       </div>
+      <span id="relogio-tv" class="so-tv text-white/70 text-sm font-semibold"></span>
       <span class="flex-1"></span>
       <span id="status" class="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-gray-200/80 text-xs font-bold text-emerald-700" role="status">
         <span class="relative flex w-2.5 h-2.5" aria-hidden="true">
@@ -130,17 +149,41 @@
         </span>
         <span data-status-texto>Ao vivo</span>
       </span>
+      <button type="button" id="tela-cheia-tv" hidden title="Voltar para a tela cheia"
+              class="controle-tv inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold bg-white/10 text-white hover:bg-white/20 transition-colors">
+        {% include 'partials/icon.html' with nome='expand' classe='w-4 h-4' %}
+        Tela cheia
+      </button>
+      <button type="button" id="sair-tv" title="Sair do modo TV"
+              class="so-tv controle-tv items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold bg-white/10 text-white hover:bg-white/20 transition-colors">
+        {% include 'partials/icon.html' with nome='collapse' classe='w-4 h-4' %}
+        Sair do modo TV
+      </button>
+      <button type="button" id="botao-tv" title="Modo TV: só o quadro em tela cheia, para deixar numa TV. Os avisos aparecem por cima sem sair da tela cheia."
+              class="esconder-tv inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-200/80 text-[#50443C] hover:bg-gray-50 transition-colors">
+        {% include 'partials/icon.html' with nome='tv' classe='w-4 h-4' %}
+        <span class="hidden sm:inline">Modo TV</span><span class="sr-only sm:hidden">Modo TV</span>
+      </button>
       <button type="button" id="botao-expandir" aria-pressed="false"
-              class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-200/80 text-[#50443C] hover:bg-gray-50 transition-colors">
+              class="esconder-tv inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-200/80 text-[#50443C] hover:bg-gray-50 transition-colors">
         <span data-icone-expandir>{% include 'partials/icon.html' with nome='expand' classe='w-4 h-4' %}</span>
         <span data-icone-recolher class="hidden">{% include 'partials/icon.html' with nome='collapse' classe='w-4 h-4' %}</span>
         <span data-expandir-texto class="hidden sm:inline">Expandir</span>
       </button>
       <button type="button" id="botao-avisar"
-              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-[#E94920]">
+              class="esconder-tv inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#E94920] text-white hover:bg-[#d03e18] transition-colors shadow-sm shadow-[#E94920]/30 aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-[#E94920]">
         {% include 'partials/icon.html' with nome='megaphone' classe='w-4 h-4' %}
         Avisar
       </button>
+    </div>
+
+    <div id="inicio-tv" hidden class="absolute inset-0 z-[80] flex flex-col items-center justify-center gap-5 px-6 text-center bg-black/85 backdrop-blur-sm">
+      <p class="neon neon-laranja font-quadro text-6xl sm:text-7xl">Quadro Rapidin</p>
+      <button type="button" id="iniciar-tv" class="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-[#E94920] text-white text-lg font-bold hover:bg-[#d03e18] shadow-lg shadow-[#E94920]/30 transition-colors">
+        {% include 'partials/icon.html' with nome='tv' classe='w-5 h-5' %}
+        Iniciar modo TV
+      </button>
+      <p class="max-w-md text-sm text-white/55 leading-relaxed">Um clique ativa a tela cheia e o som dos avisos.<br>Dica: com <strong class="text-white/80">F11</strong> a tela cheia do navegador nunca sai sozinha.</p>
     </div>
 
     <div class="quadro-palco">
@@ -154,7 +197,8 @@
                   <ul id="linhas" class="quadro-linhas" aria-label="Linhas do quadro"></ul>
                   <div id="vazio" class="quadro-vazio" hidden>
                     <p class="neon neon-laranja font-quadro quadro-vazio-titulo opacity-75">Quadro limpo</p>
-                    <p class="quadro-vazio-texto mt-2 text-white/45">Digite abaixo ou use a <span class="text-white/75">Caneta</span> e as formas para desenhar.</p>
+                    <p class="quadro-vazio-texto esconder-tv mt-2 text-white/45">Digite abaixo ou use a <span class="text-white/75">Caneta</span> e as formas para desenhar.</p>
+                    <p class="quadro-vazio-texto so-tv mt-2 text-white/45">Nenhum aviso no quadro agora.</p>
                   </div>
                   <svg id="desenho" class="quadro-desenho" role="img" aria-label="Desenhos do quadro">
                     <g id="g-brilho" filter="url(#quadro-brilho)"></g>
@@ -166,7 +210,7 @@
               </div>
             </div>
 
-            <form id="form-escrever" class="px-3 sm:px-6 py-3 border-t border-white/10 flex items-center gap-2 sm:gap-3" autocomplete="off" novalidate>
+            <form id="form-escrever" class="esconder-tv px-3 sm:px-6 py-3 border-t border-white/10 flex items-center gap-2 sm:gap-3" autocomplete="off" novalidate>
               <label for="nova-linha" class="sr-only">Escrever no quadro</label>
               <input id="nova-linha" type="text" maxlength="{{ max_texto }}" enterkeyhint="send"
                      placeholder="Digite aqui... ex.: Centro 1/12 fora parcialmente"
@@ -181,7 +225,7 @@
       </div>
 
       <!-- Bandeja: cor da caneta, desfazer e limpar -->
-      <div class="mx-4 sm:mx-8 flex items-center gap-3 sm:gap-4 px-4 sm:px-5 pt-4 pb-3 rounded-b-2xl bg-gradient-to-b from-[#3a3a44] to-[#25252d] shadow-md">
+      <div class="esconder-tv mx-4 sm:mx-8 flex items-center gap-3 sm:gap-4 px-4 sm:px-5 pt-4 pb-3 rounded-b-2xl bg-gradient-to-b from-[#3a3a44] to-[#25252d] shadow-md">
         <fieldset class="flex items-center gap-x-2.5 gap-y-2 sm:gap-x-3 flex-wrap min-w-0">
           <legend class="sr-only">Cor da caneta</legend>
           {% for valor, rotulo in cores %}
@@ -788,7 +832,12 @@
   // ---------- expandir ----------
   var botaoExpandir = document.getElementById('botao-expandir');
   var expandido = false;
-  function expandir(ativar) {
+  function pedirTelaCheia() {
+    if (secao.requestFullscreen && !document.fullscreenElement) {
+      secao.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
+    }
+  }
+  function expandir(ativar, comTelaCheia) {
     if (ativar === expandido) return;
     expandido = ativar;
     secao.classList.toggle('quadro-expandido', ativar);
@@ -799,21 +848,109 @@
     botaoExpandir.querySelector('[data-expandir-texto]').textContent = ativar ? 'Sair da tela cheia' : 'Expandir';
     botaoExpandir.setAttribute('aria-label', ativar ? 'Sair da tela cheia' : 'Expandir o quadro');
     (ativar ? secao : document.body).appendChild(caixaToasts);  // em tela cheia só a seção aparece
-    if (ativar && secao.requestFullscreen && !document.fullscreenElement) {
-      secao.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
-    } else if (!ativar && document.fullscreenElement) {
-      document.exitFullscreen().catch(function () {});
-    }
+    // Em tela cheia o aviso abre dentro do quadro, para não desfazer a tela cheia
+    ao.containerAviso = ativar ? secao : null;
+    ao.reposicionarAviso();
+    if (ativar && comTelaCheia !== false) pedirTelaCheia();
+    else if (!ativar && document.fullscreenElement) document.exitFullscreen().catch(function () {});
   }
   botaoExpandir.addEventListener('click', function () { expandir(!expandido); });
   document.addEventListener('fullscreenchange', function () {
-    if (!document.fullscreenElement && expandido) expandir(false);  // saiu com Esc
+    // No modo TV o quadro continua ocupando a tela mesmo se a tela cheia do navegador sair
+    if (!document.fullscreenElement && expandido && !modoTv) expandir(false);  // saiu com Esc
+    atualizarBotaoTelaCheia();
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && expandido && !document.fullscreenElement && editando === null && !document.querySelector('dialog[open]')) {
+    if (e.key === 'Escape' && expandido && !modoTv && !document.fullscreenElement && editando === null && !document.querySelector('dialog[open]')) {
       expandir(false);
     }
   });
+
+  // ---------- modo TV ----------
+  // Para deixar o quadro numa TV: só o quadro (sem ferramentas), relógio, cursor escondido,
+  // tela sempre ligada e avisos por cima do quadro, sem nunca sair da tela cheia.
+  var modoTv = false, travaTela = null, relogioTv = null, cursorTv = null;
+  var inicioTv = document.getElementById('inicio-tv');
+  var botaoTelaCheiaTv = document.getElementById('tela-cheia-tv');
+
+  function urlDoModoTv(ligado) {
+    var url = new URL(location.href);
+    if (ligado) url.searchParams.set('modo', 'tv'); else url.searchParams.delete('modo');
+    return url.pathname + url.search;
+  }
+
+  function entrarModoTv(comClique) {
+    modoTv = true;
+    ao.modoTv = true;
+    if (editando !== null) fecharEdicao();
+    escolherFerramenta('texto');
+    secao.classList.add('modo-tv');
+    expandir(true, comClique);
+    history.replaceState(null, '', urlDoModoTv(true));
+    if (comClique) ao.liberarSom();
+    // Aberto direto pelo endereço (sem clique): pede um clique para tela cheia e som,
+    // a não ser que o navegador já libere som sozinho (modo quiosque)
+    inicioTv.hidden = comClique || ao.somLiberado();
+    manterTelaLigada();
+    atualizarRelogio();
+    relogioTv = setInterval(atualizarRelogio, 10000);
+    mexeuMouse();
+    atualizarBotaoTelaCheia();
+    ao.consultarAgora();
+  }
+
+  function sairModoTv() {
+    modoTv = false;
+    ao.modoTv = false;
+    secao.classList.remove('modo-tv', 'cursor-oculto', 'mostrar-controles');
+    inicioTv.hidden = true;
+    clearInterval(relogioTv);
+    if (travaTela) { travaTela.release().catch(function () {}); travaTela = null; }
+    history.replaceState(null, '', urlDoModoTv(false));
+    expandir(false);
+  }
+
+  document.getElementById('botao-tv').addEventListener('click', function () { entrarModoTv(true); });
+  document.getElementById('sair-tv').addEventListener('click', sairModoTv);
+  document.getElementById('iniciar-tv').addEventListener('click', function () {
+    inicioTv.hidden = true;
+    ao.liberarSom();
+    pedirTelaCheia();
+  });
+  botaoTelaCheiaTv.addEventListener('click', pedirTelaCheia);
+
+  // Botão "Tela cheia" só aparece se a tela cheia caiu (nem do quadro, nem do navegador com F11)
+  function atualizarBotaoTelaCheia() {
+    var navegadorEmTelaCheia = window.innerHeight >= screen.height - 2 && window.innerWidth >= screen.width - 2;
+    botaoTelaCheiaTv.hidden = !modoTv || !!document.fullscreenElement || navegadorEmTelaCheia;
+  }
+  window.addEventListener('resize', atualizarBotaoTelaCheia);
+
+  // Tela da TV não apaga nem entra em descanso
+  function manterTelaLigada() {
+    if (!modoTv || !navigator.wakeLock || document.hidden) return;
+    navigator.wakeLock.request('screen').then(function (t) { travaTela = t; }).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', manterTelaLigada);
+
+  function atualizarRelogio() {
+    var agora = new Date();
+    var data = agora.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+    document.getElementById('relogio-tv').textContent =
+      data.charAt(0).toUpperCase() + data.slice(1) + ' · ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Cursor e botões somem depois de 3 s sem mexer o mouse
+  function mexeuMouse() {
+    if (!modoTv) return;
+    secao.classList.remove('cursor-oculto');
+    secao.classList.add('mostrar-controles');
+    clearTimeout(cursorTv);
+    cursorTv = setTimeout(function () {
+      if (modoTv) { secao.classList.add('cursor-oculto'); secao.classList.remove('mostrar-controles'); }
+    }, 3000);
+  }
+  secao.addEventListener('pointermove', mexeuMouse);
 
   // ---------- lateral ----------
   function renderConectados() {
@@ -890,6 +1027,7 @@
     else if (e.target.closest('[data-botao-apagar]')) apagarLinha(id);
   });
   lista.addEventListener('dblclick', function (e) {
+    if (modoTv) return;
     var alvo = e.target.closest('[data-editar]');
     if (alvo) abrirEdicao(alvo.closest('li'), Number(alvo.closest('li').dataset.id));
   });
@@ -1157,6 +1295,7 @@
 
   render();
   renderConectados();
+  if (new URLSearchParams(location.search).get('modo') === 'tv') entrarModoTv(false);
 })();
 </script>
 {% endblock %}

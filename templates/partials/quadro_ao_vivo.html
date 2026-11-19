@@ -47,6 +47,25 @@
 
   @keyframes pulso-aviso { 0% { box-shadow: 0 0 0 0 rgba(233,73,32,.5); } 100% { box-shadow: 0 0 0 12px rgba(233,73,32,0); } }
   .pulso-aviso { animation: pulso-aviso 1.8s ease-out infinite; }
+  /* Aviso dentro do quadro em tela cheia (Expandir / modo TV): fica dentro do elemento em tela
+     cheia em vez de abrir por cima como janela separada, então a tela cheia nunca é desfeita */
+  dialog.aviso-embutido[open] {
+    position: fixed; inset: 0; z-index: 90; margin: 0; padding: 24px;
+    width: 100%; height: 100%; max-width: none; max-height: none;
+    display: flex; align-items: center; justify-content: center; overflow: auto;
+    background: rgba(0,0,0,.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  /* Cabe sempre na tela: o desenho encolhe para dar lugar ao texto */
+  dialog.aviso-embutido > .neon-moldura { width: min(100%, 64rem); max-height: 100%; margin: auto; display: flex; flex-direction: column; }
+  dialog.aviso-embutido .neon-moldura__borda,
+  dialog.aviso-embutido [data-alerta-painel] { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  dialog.aviso-embutido #alerta-quadro-linhas li { font-size: clamp(24px, min(3.2vw, 5.5vh), 56px); }
+  dialog.aviso-embutido.com-desenho > .neon-moldura { height: 100%; }
+  dialog.aviso-embutido [data-alerta-desenho]:not(.hidden) { flex: 1 1 0; min-height: 120px; position: relative; }
+  dialog.aviso-embutido [data-alerta-desenho] svg {
+    position: absolute; inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px);
+    max-height: none; aspect-ratio: auto !important;
+  }
   /* Tempo que o aviso fica na tela: a barra encolhe e, quando acaba, o aviso fecha sozinho */
   @keyframes alerta-tempo { from { transform: scaleX(1); } to { transform: scaleX(0); } }
   .alerta-tempo { transform-origin: left; animation: alerta-tempo var(--duracao, 30s) linear forwards; }
@@ -67,7 +86,7 @@
   <div class="neon-moldura outline-none" data-alerta-moldura tabindex="-1" style="--raio: 28px">
     <span class="neon-moldura__aura" aria-hidden="true"></span>
     <div class="neon-moldura__borda">
-      <div class="relative overflow-hidden rounded-[26px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
+      <div data-alerta-painel class="relative overflow-hidden rounded-[26px] bg-[#09090e] px-5 sm:px-7 pt-6 pb-5">
         <div class="flex items-start gap-3">
           <span class="pulso-aviso w-11 h-11 rounded-2xl bg-[#E94920] text-white flex items-center justify-center shrink-0">
             {% include 'partials/icon.html' with nome='megaphone' classe='w-6 h-6' %}
@@ -131,6 +150,26 @@
     versao: null,      // definido pela página do quadro
     ouvinte: null,     // function (resposta, inicioDaConsulta)
     aoMudarStatus: null,
+    modoTv: false,         // a página do quadro liga no modo TV
+    containerAviso: null,  // em tela cheia, o aviso abre dentro deste elemento (ver abrirDialogo)
+    // Chamado ao entrar/sair da tela cheia: um aviso aberto passa para o lugar certo
+    reposicionarAviso: function () { if (alertaAtual) abrirDialogo(); },
+    // Chamado num clique: libera som e voz para os próximos avisos
+    liberarSom: function () {
+      try {
+        audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+        if (audio.state === 'suspended') audio.resume();
+      } catch (e) {}
+    },
+    // O navegador já deixa tocar som sem clique? (ex.: aberto com --autoplay-policy=no-user-gesture-required)
+    somLiberado: function () {
+      try {
+        var teste = new (window.AudioContext || window.webkitAudioContext)();
+        var liberado = teste.state === 'running';
+        teste.close();
+        return liberado;
+      } catch (e) { return false; }
+    },
     assinar: function (versao, ouvinte) { api.versao = versao; api.ouvinte = ouvinte; consultar(); },
     consultarAgora: function () { consultar(); },
     vozAtiva: function () { return ler('localStorage', CHAVE_VOZ) !== '0'; },
@@ -236,6 +275,7 @@
     var params = new URLSearchParams();
     if (visto !== null) params.set('alerta', visto);
     if (api.ouvinte) params.set('versao', api.versao || '');
+    if (api.modoTv) params.set('tv', '1');
     fetch(URL_NOVIDADES + '?' + params.toString(), {
       credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'application/json' }
     })
@@ -337,12 +377,11 @@
     var tracos = a.tracos || [];
     caixaDesenho.replaceChildren();
     caixaDesenho.classList.toggle('hidden', !tracos.length);
+    dialogo.classList.toggle('com-desenho', !!tracos.length);
     if (tracos.length) caixaDesenho.appendChild(previa(tracos));
     dicaVoz.classList.add('hidden');
     textoOuvir.textContent = 'Ouvir de novo';
-    if (!dialogo.open) {
-      if (dialogo.showModal) dialogo.showModal(); else dialogo.setAttribute('open', '');
-    }
+    abrirDialogo();
     // Foco no painel (e não num botão): quem estava digitando não fecha o aviso sem querer
     painelAlerta.focus({ preventScroll: true });
     pulsar(painelAlerta);
@@ -356,6 +395,23 @@
     }
     notificarSistema(a);
     piscarTitulo();
+  }
+
+  // Com o quadro em tela cheia, o aviso abre dentro dele (não modal). Uma janela modal fica fora
+  // do elemento em tela cheia, e o navegador pode desfazer a tela cheia por causa dela.
+  function abrirDialogo() {
+    var dentro = api.containerAviso;
+    if (dialogo.open && dialogo.classList.contains('aviso-embutido') === !!dentro) return;
+    if (dialogo.open) dialogo.close();
+    dialogo.classList.toggle('aviso-embutido', !!dentro);
+    if (dentro) {
+      if (dialogo.parentNode !== dentro) dentro.appendChild(dialogo);
+      dialogo.show();
+    } else if (dialogo.showModal) {
+      dialogo.showModal();
+    } else {
+      dialogo.setAttribute('open', '');
+    }
   }
 
   // opcoes.outrasAbas: fecha também nas outras abas; opcoes.calar: interrompe a leitura

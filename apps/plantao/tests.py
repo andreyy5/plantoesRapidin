@@ -566,6 +566,19 @@ class QuadroNocTests(TestCase):
         # Quem acabou de abrir o sistema (sem histórico) também não
         self.assertIsNone(self._novidades(self.tec_user)['alerta'])
 
+    def test_tv_recebe_aviso_mandado_pela_mesma_conta(self):
+        self._post('quadro_escrever', {'texto': 'A'})
+        self._post('quadro_avisar')
+        # Uma página comum de quem mandou não recebe; a TV logada com a mesma conta recebe
+        self.assertIsNone(self._novidades(self.noc, alerta=0)['alerta'])
+        self.assertEqual(self._novidades(self.noc, alerta=0, tv='1')['alerta']['linhas'][0]['texto'], 'A')
+
+    def test_pagina_tem_o_modo_tv(self):
+        self.client.force_login(self.sac_user)
+        resp = self.client.get(reverse('quadro'), {'modo': 'tv'})
+        self.assertContains(resp, 'id="botao-tv"')
+        self.assertContains(resp, 'Iniciar modo TV')
+
     def test_avisar_so_as_linhas_escolhidas(self):
         ids = [self._post('quadro_escrever', {'texto': t}).json()['id'] for t in ('A', 'B', 'C')]
         self._post('quadro_avisar', {'ids': [ids[1]]})
